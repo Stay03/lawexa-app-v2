@@ -4,7 +4,7 @@ import { AlertCircle, RotateCcw, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ErrorMessage } from '@/types/chat';
 import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
-import { useReadOnlyTranscript } from '../read-only';
+import { useCanAct } from '../read-only';
 
 /**
  * ErrorRow — v2-native render of a backend ErrorMessage (§C KEEP: error banners +
@@ -41,8 +41,8 @@ export function ErrorRow({
   onRetry: () => void;
   isStreaming: boolean;
 }) {
-  // Staff reading the person's chat cannot send it again (read-only.tsx).
-  const readOnly = useReadOnlyTranscript();
+  // Staff reading the person's chat, or a reader who may not send, cannot send it again (useCanAct).
+  const canAct = useCanAct();
   if (EXHAUSTED_CODES.has(message.errorCode)) {
     return <OutOfMessagesNotice tight blocked={message.blocked} fallbackMessage={message.content} />;
   }
@@ -72,7 +72,7 @@ export function ErrorRow({
           <p className="font-medium text-foreground">{FAILED_ANSWER_LINE}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{FAILED_ANSWER_FREE}</p>
         </div>
-        {message.retryable && !readOnly && (
+        {message.retryable && canAct && (
           <Button
             variant="ghost"
             size="sm"
@@ -99,7 +99,7 @@ export function ErrorRow({
           </p>
         )}
       </div>
-      {message.retryable && !readOnly && (
+      {message.retryable && canAct && (
         <Button
           variant="ghost"
           size="sm"

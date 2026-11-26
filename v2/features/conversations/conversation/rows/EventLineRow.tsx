@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import type { BackgroundJobEvent, DraftEditEvent, EventMessage, QuizGameEvent } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { notesQueries } from '@/v2/features/notes/queries';
+import { useDraftNotesSource } from '../draft/draft-notes-source';
 import { useLiveQuizRoom } from '@/v2/features/channels/quiz/live-quiz-room-context';
 import { QuizGameCard } from '@/v2/features/channels/quiz/QuizGameCard';
 import { useV2ChatContext } from '../chat-context';
@@ -112,8 +112,10 @@ function DraftEditLine({ line }: { line: DraftEditEvent }) {
   const chat = useV2ChatContext();
   const panel = useSidePanel();
   const { userId: viewerId } = useV2Session();
+  // The admin view names its chat and reads its list through the draft notes' source (draft-notes-source.ts).
+  const source = useDraftNotesSource();
   const drafts = useQuery({
-    ...notesQueries.draftNotes({ conversationId: chat?.conversationId ?? '', viewerId }),
+    ...source.draftNotes({ conversationId: chat?.conversationId ?? source.conversationId ?? '', viewerId }),
     enabled: false,
   });
   const ordinal = panel ? draftOrdinalForLine(drafts.data?.data.documents, line.noteId) : null;

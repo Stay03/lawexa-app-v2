@@ -81,7 +81,7 @@ test('on a computer, where nothing is saved, a Download menu holds Word and PDF'
   const bar = read('./DraftSaveBar.tsx');
   const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('export function DraftSaveBar'));
   // An older version, a confidential chat, a deleted or unreached note: no note menu, the downloads.
-  assert.match(control, /\) : \(\s*<DownloadMenu downloads=\{tools\.downloads\} \/>\s*\)\}/);
+  assert.match(control, /\) : \(\s*<DownloadMenu downloads=\{tools\.downloads\} onHistory=\{onHistory\} \/>\s*\)\}/);
   // A failed download says why under the control.
   assert.match(control, /<p role="alert" className=\{FAILURE_BOX\}>\s*\{tools\.downloads\.failure\}\s*<\/p>/);
   const menu = bar.slice(bar.indexOf('function DownloadMenu'));
@@ -108,7 +108,7 @@ test('on the phone sheet, where nothing is saved, the foot has Download Word and
   const foot = bar.slice(bar.indexOf('export function DraftSaveBar'), bar.indexOf('function DownloadPill'));
   assert.match(
     foot,
-    /\) : \(\s*\/\/[^\n]*\n\s*<div className="flex items-center gap-2">\s*<DownloadPill downloads=\{tools\.downloads\} format="docx" label="Download Word" short="Word" \/>\s*<DownloadPill downloads=\{tools\.downloads\} format="pdf" label="Download PDF" short="PDF" \/>\s*<\/div>\s*\)\}/,
+    /\) : \(\s*\/\/[^\n]*\n\s*<div className="flex items-center gap-2">[\s\S]{0,420}?<DownloadPill downloads=\{tools\.downloads\} format="docx" label="Download Word" short="Word" \/>\s*<DownloadPill downloads=\{tools\.downloads\} format="pdf" label="Download PDF" short="PDF" \/>\s*<\/div>\s*\)\}/,
   );
   // Short words, so the row stays one row on a phone; the button's name is the full one.
   assert.match(bar, /aria-label=\{label\}\s*className=\{cn\(ACTION_PILL, FOCUS_RING\)\}/);

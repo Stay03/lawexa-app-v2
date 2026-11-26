@@ -156,11 +156,19 @@ export function catchUpClockStart(readAt: number, answerDone: boolean, lastReadW
 }
 
 /**
+ * Who reads the panel: the chat's own reader, or staff in the admin
+ * conversation view (a snapshot of the owner's chat, read only; Stay, thread
+ * 085a980c, 26 November 2026), whose lines speak of the owner.
+ */
+export type DraftReader = 'owner' | 'staff';
+
+/**
  * The line at the top of a panel that does not edit the note, or `null` for
  * one that does. Each says what the reader sees and, where there is one, what
  * to do.
  */
-export function draftNoteLine(state: DraftNoteState, waitedMs = 0): string | null {
+export function draftNoteLine(state: DraftNoteState, waitedMs = 0, reader: DraftReader = 'owner'): string | null {
+  if (reader === 'staff') return staffLine(state);
   switch (state.kind) {
     case 'older':
       return 'An older version, as Lawexa wrote it. Your note is the latest version.';
@@ -185,6 +193,46 @@ const MISSING_LINE: Record<DraftNoteMissing, string> = {
   limit: 'You’ve reached your note limit, so this draft isn’t saved. Download it to keep it.',
   moved: 'This chat moved after the draft was saved, so its note stays where it was. Download this version to keep it.',
   hidden: 'This draft’s note isn’t one you can open. Download it to keep a copy.',
+  // The owner's own list makes the note as it reads (Backend 7b74631e); worded for completeness.
+  not_made_yet: 'This draft isn’t saved as a note yet. Download it to keep it.',
+};
+
+/**
+ * Staff's line in the admin view: what the owner has, never "you". The view
+ * is a snapshot that moves nothing, so a note behind Lawexa's newest version
+ * is shown as the owner's next open would show it (Lawexa's text), and nothing
+ * waits for it to catch up.
+ */
+function staffLine(state: DraftNoteState): string | null {
+  switch (state.kind) {
+    case 'editable':
+    case 'read-only':
+      return state.document.edited
+        ? 'The owner’s note, with their edits. Lawexa works from this text. Read only here.'
+        : 'The owner’s note, as Lawexa wrote it. Read only here.';
+    case 'older':
+      return 'An older version, as Lawexa wrote it. The owner’s note is the latest version.';
+    case 'catching-up':
+      return state.document
+        ? 'The owner hasn’t opened this version yet. It shows as Lawexa wrote it, as their next open will.'
+        : 'This version isn’t in the owner’s notes yet. It shows as Lawexa wrote it.';
+    case 'missing':
+      return STAFF_MISSING_LINE[state.reason];
+    case 'notes-off':
+      return 'This chat keeps no draft notes. It shows as Lawexa wrote it.';
+    case 'unlisted':
+      return 'The owner’s notes couldn’t be read. It shows as Lawexa wrote it.';
+    default:
+      return null;
+  }
+}
+
+const STAFF_MISSING_LINE: Record<DraftNoteMissing, string> = {
+  deleted: 'The owner deleted this draft’s note. It shows as Lawexa wrote it.',
+  limit: 'The owner is at their note limit, so this draft isn’t saved as a note. It shows as Lawexa wrote it.',
+  moved: 'The chat moved after this draft was saved, so its note stayed where it was. It shows as Lawexa wrote it.',
+  hidden: 'The owner can’t open this draft’s note. It shows as Lawexa wrote it.',
+  not_made_yet: 'Not saved as a note yet: the owner’s next open saves it. It shows as Lawexa wrote it.',
 };
 
 /** Whether the panel's editor takes typing: into the note, or where no note is kept into the page's memory. */

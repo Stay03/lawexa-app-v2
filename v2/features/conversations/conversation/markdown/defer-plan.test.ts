@@ -163,7 +163,8 @@ test('MessageList provides the scroller, the bottom and the open to the answers'
   );
   assert.match(
     messageList,
-    /openDefersBlocks\(\{\s*opened,\s*scrolledUp: detachedAt !== null,\s*turnRunning: isStreaming,\s*\}\)/,
+    // `flow` (the admin view, read from its top) counts as opened: each answer parses whole.
+    /openDefersBlocks\(\{\s*\/\/[^\n]*\n\s*opened: opened \|\| flow,\s*scrolledUp: detachedAt !== null,\s*turnRunning: isStreaming,\s*\}\)/,
   );
   assert.match(
     messageList,

@@ -2,6 +2,8 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 
+import { useV2ChatContext } from './chat-context';
+
 /**
  * A transcript drawn for someone who is not its reader: the admin
  * conversation view (thread 085a980c), where staff read another person's chat
@@ -17,7 +19,43 @@ export function ReadOnlyTranscript({ children }: { children: ReactNode }) {
   return <ReadOnlyTranscriptContext.Provider value>{children}</ReadOnlyTranscriptContext.Provider>;
 }
 
-/** True inside a transcript drawn for someone who is not its reader. */
-export function useReadOnlyTranscript(): boolean {
+/**
+ * May the reader press a control in the transcript that writes (save, send,
+ * stop, cancel, free, connect, ask again)? One rule for every row and card
+ * (card e4b12be8, thread 085a980c, 26 November 2026):
+ *
+ * - false in a transcript drawn for someone who is not its reader (the admin
+ *   view, `ReadOnlyTranscript`);
+ * - false outside a chat screen (no chat context: nothing to act for);
+ * - false for a reader who may not send in this chat (a Space's Viewer, a
+ *   shared link: the controller's `canSend`);
+ * - true otherwise.
+ *
+ * A row shows what it shows either way and only withholds the press. The
+ * source test (can-act.test.ts) fails a row that writes without asking.
+ */
+export function useCanAct(): boolean {
+  const readOnly = useContext(ReadOnlyTranscriptContext);
+  const chat = useV2ChatContext();
+  return !readOnly && chat !== null && chat.canSend;
+}
+
+/**
+ * The narrower question for a control that writes to the reader's OWN
+ * account, not to the chat ("Save as my template" on a sent document): a
+ * Space's Viewer or a shared-link reader keeps it. False only in a transcript
+ * drawn for someone who is not its reader (the admin view), where it would
+ * write to the staff member's account (Techlead, 26 November 2026).
+ */
+export function useCanActForSelf(): boolean {
+  return !useContext(ReadOnlyTranscriptContext);
+}
+
+/**
+ * Is the transcript drawn for someone who is not its reader (the admin view)?
+ * For words, not controls: a row that says "your Files" says "the owner's
+ * Files" there, and links to nothing of the staff member's own.
+ */
+export function useDrawnForSomeoneElse(): boolean {
   return useContext(ReadOnlyTranscriptContext);
 }

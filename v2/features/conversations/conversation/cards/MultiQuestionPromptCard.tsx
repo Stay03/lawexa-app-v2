@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useV2ChatContext } from '@/v2/features/conversations/conversation/chat-context';
 import { NotificationNudge } from './NotificationNudge';
-import { useReadOnlyTranscript } from '../read-only';
+import { useCanAct } from '../read-only';
 import type { MultiQuestionPromptInfo } from '@/lib/utils/parse-content-xml';
 
 interface MultiQuestionPromptCardProps {
@@ -27,8 +27,8 @@ export function MultiQuestionPromptCard({ prompt, isInteracted = false }: MultiQ
   const [isAtBottom, setIsAtBottom] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatContext = useV2ChatContext();
-  // Staff reading the person's chat see the card's choices, never press them (read-only.tsx).
-  const readOnly = useReadOnlyTranscript();
+  // Staff in the admin view, or a reader who may not send, see the choices and never press them (useCanAct).
+  const canAct = useCanAct();
 
   const handleAction = (label: string) => {
     setClicked(true);
@@ -98,14 +98,14 @@ export function MultiQuestionPromptCard({ prompt, isInteracted = false }: MultiQ
               key={action.id}
               variant={action.id === 'begin' ? 'default' : 'outline'}
               size="sm"
-              disabled={clicked || isInteracted || chatContext?.isStreaming || chatContext?.canSend === false || readOnly}
+              disabled={clicked || isInteracted || chatContext?.isStreaming || !canAct}
               onClick={() => handleAction(action.label)}
             >
               {action.label}
             </Button>
           ))}
         </div>
-        {readOnly ? null : <NotificationNudge />}
+        {canAct ? <NotificationNudge /> : null}
       </CardFooter>
     </Card>
   );

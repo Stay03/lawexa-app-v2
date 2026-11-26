@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Building2, MapPin, LinkedinIcon, Briefcase } from 'lucide-react';
-import { useReadOnlyTranscript } from '../read-only';
+import { useCanAct } from '../read-only';
 
 /**
  * The "Connect with" form loads when a reader first reaches for the button,
@@ -56,8 +56,8 @@ function getFirstName(name: string): string {
 }
 
 export function LawyerCard({ lawyer }: { lawyer: LawyerInfo }) {
-  // Staff reading the person's chat must not send a connection request as themselves (read-only.tsx).
-  const readOnly = useReadOnlyTranscript();
+  // No connection request from staff reading the person's chat, or from a reader who may not send (useCanAct).
+  const canAct = useCanAct();
   const [dialogOpen, setDialogOpen] = useState(false);
   // Mounted on the first open and kept afterwards, so the dialog's own exit
   // animation still plays when it closes.
@@ -143,7 +143,7 @@ export function LawyerCard({ lawyer }: { lawyer: LawyerInfo }) {
               </div>
             )}
 
-            {readOnly ? null : (
+            {!canAct ? null : (
             <Button
               size="xs"
               className="mt-2"

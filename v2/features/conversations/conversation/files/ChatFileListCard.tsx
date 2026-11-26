@@ -77,7 +77,7 @@ export function ChatFileListCard({ message }: { message: ToolMessage }) {
       <ul className="divide-y divide-border/60">
         {rows.map((row) => (
           <li key={row.id}>
-            <FileRow row={row} open={openId === row.id} onOpen={panel ? () => panel.open({ kind: 'file', id: row.id }) : null} />
+            <FileRow row={row} open={openId === row.id} onOpen={panel?.shows('file') ? () => panel.open({ kind: 'file', id: row.id }) : null} />
           </li>
         ))}
       </ul>

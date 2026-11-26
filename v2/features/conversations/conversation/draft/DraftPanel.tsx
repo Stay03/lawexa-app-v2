@@ -20,6 +20,7 @@ import { DraftDocument } from './DraftCard';
 import { draftGroupKey, draftKeysByMessage, draftVersionTitle } from './draft-versions';
 import { newestFinished } from './draft-note-state';
 import { DraftVersionSwitch } from './DraftVersionSwitch';
+import { useDraftNotesSource } from './draft-notes-source';
 
 /**
  * "Show changes" as the reader last set it, kept while they step between a
@@ -82,7 +83,9 @@ export function DraftPanel({
   const streamingMessage = 'streamingIndex' in place ? messages.findLast((message) => !isEventMessage(message) && message.isStreaming) : undefined;
   const live = useStreamingText(streamingText, streamingMessage?.id ?? '');
   const chat = useV2ChatContext();
-  const conversationId = chat?.conversationId;
+  // The admin view names its chat through the draft notes' source (it has no chat context).
+  const source = useDraftNotesSource();
+  const conversationId = chat?.conversationId ?? source.conversationId ?? undefined;
   const panel = useSidePanel();
   const space = panel?.space ?? null;
   // The reader's choice on this version, once they make one; until then the last one they made.

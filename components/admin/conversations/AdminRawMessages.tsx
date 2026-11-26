@@ -62,7 +62,8 @@ function RawMessage({ conversationId, message }: { conversationId: string; messa
         )}
       </div>
       {load.isError && <p className="px-3 pt-2 text-xs text-destructive">{extractApiError(load.error).message}</p>}
-      <pre className="max-h-96 overflow-auto px-3 py-2 text-[11px] leading-relaxed break-words whitespace-pre-wrap">
+      {/* Whole, in the page's one scroll (Stay, 26 November 2026): no box of its own to scroll. */}
+      <pre className="px-3 py-2 text-[11px] leading-relaxed break-all whitespace-pre-wrap">
         {JSON.stringify(shown, null, 2)}
       </pre>
     </li>

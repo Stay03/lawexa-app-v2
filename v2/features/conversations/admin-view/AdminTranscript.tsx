@@ -16,6 +16,11 @@ import { BackgroundJobsProvider } from '../conversation/background-jobs/context'
 import { MessageList } from '../conversation/MessageList';
 import { ReadOnlyTranscript } from '../conversation/read-only';
 import { TurnFooterProvider, type TurnFooterRender } from '../conversation/rows/turn-footer';
+import { AdminSidePanel } from './AdminSidePanel';
+import { adminToolResults, withCutResultsLeftOut } from './admin-tool-results';
+import { adminHeldItems } from './admin-held-items';
+import { HeldItemsSourceProvider } from '../conversation/held-items-source';
+import { ToolResultSourceProvider } from '../conversation/tools/tool-result-source';
 import '@/v2/shell/shell.css';
 
 /**
@@ -31,13 +36,20 @@ import '@/v2/shell/shell.css';
  * staff reading another person's chat must not leave it in the browser's
  * cache.
  *
+ * ONE SCROLL. The transcript has no scroller of its own: it grows in the
+ * admin page, which opens at the chat's first message (MessageList `flow`).
+ *
  * READ ONLY. A snapshot: nothing streams, and the page reads it again only on
  * Refresh. No chat context is provided, so nothing in a row can send, answer
  * a card, keep a file as a template or regenerate; `ReadOnlyTranscript` turns
  * off every other row that could act (a skill draft's Save and Dismiss, the
  * machine's Free it, a prompt card's choices, Connect with a lawyer, Try
- * again); background jobs show without Cancel; agent rows show without Stop
+ * again); background jobs show without Cancel (useCanAct); agent rows show without Stop
  * and follow no running turn.
+ *
+ * THE SIDE PANEL (AdminSidePanel.tsx). A draft or a file opens beside the
+ * transcript as it does on the owner's page, read only (Stay, 26 November
+ * 2026: "like for like as user side"). The page gives the panel its box.
  *
  * DRAWN AS THE OWNER. The rows ask the session who is reading ("mine", a
  * Space author's name); here that is the owner, as the server drew the data
@@ -57,19 +69,28 @@ export function AdminTranscript({
   agentConversations,
   jobs,
   turnFooter,
+  panelHost = null,
+  onPanelOpenChange,
 }: {
   view: AdminConversationView;
   agentConversations: readonly AgentConversation[];
   jobs: readonly BackgroundJob[];
   turnFooter: TurnFooterRender;
+  /** The page's box for the side panel on a computer; `null` until drawn. */
+  panelHost?: HTMLElement | null;
+  /** The side panel opened or closed, so the page makes room for it. */
+  onPanelOpenChange?: (open: boolean) => void;
 }) {
   const messages = useMemo(
-    () => transformApiMessages(view.messages, { events: true }) as EngineMessage[],
+    // A result cut at 200 kB is fetched whole when its step opens, as the owner's chat does (admin-tool-results.ts).
+    () => transformApiMessages(withCutResultsLeftOut(view.messages), { events: true }) as EngineMessage[],
     [view.messages],
   );
   // A closed snapshot of the chain: staff may not type into or stop any agent, and a snapshot follows no live turn.
   const chain = useMemo(() => adminChainSnapshot(agentConversations), [agentConversations]);
   const references = useMemo(() => view.references ?? [], [view.references]);
+  const toolResults = useMemo(() => adminToolResults(view.id), [view.id]);
+  const heldItems = useMemo(() => adminHeldItems(view.id), [view.id]);
   const owner = view.owner;
   // One client for the page's life, with v2's defaults and no persister.
   const [queryClient] = useState(() => makeQueryClient());
@@ -100,34 +121,48 @@ export function AdminTranscript({
           mayHaveWrapped={false}
           wrappedHidden
         >
-          <BackgroundJobsProvider conversationId={view.id} jobs={jobs} readOnly>
-            <AgentChainProvider conversationId={view.id} chain={chain}>
-              <TurnFooterProvider render={turnFooter}>
-                <div data-admin-transcript="" className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
-                  <MessageList
-                    messages={messages}
-                    streamingText={STILL}
-                    reasoning={STILL}
-                    isStreaming={false}
-                    isLoadingHistory={false}
-                    error={null}
-                    narration={null}
-                    references={references}
-                    canRegenerate={false}
-                    onRegenerate={NO_OP}
-                    onRetry={NO_OP}
-                    showAuthors={false}
-                    viewerId={view.user_id}
-                    viewerUuid={owner?.uuid ?? view.user_uuid}
-                    redacted={view.is_redacted === true}
-                    masthead={null}
-                    underBar={false}
-                    onReply={null}
-                  />
-                </div>
-              </TurnFooterProvider>
-            </AgentChainProvider>
-          </BackgroundJobsProvider>
+          <ToolResultSourceProvider value={toolResults}>
+          <HeldItemsSourceProvider value={heldItems}>
+              <BackgroundJobsProvider conversationId={view.id} jobs={jobs}>
+                <AgentChainProvider conversationId={view.id} chain={chain}>
+                  <TurnFooterProvider render={turnFooter}>
+                    <AdminSidePanel
+                      conversationId={view.id}
+                      messages={messages}
+                      streamingText={STILL}
+                      host={panelHost}
+                      onOpenChange={onPanelOpenChange}
+                    >
+                      {/* Read in the admin page's own scroll, from the top (Stay, 26 November 2026). */}
+                      <div data-admin-transcript="" className="relative flex min-w-0 flex-col">
+                        <MessageList
+                          messages={messages}
+                          streamingText={STILL}
+                          reasoning={STILL}
+                          isStreaming={false}
+                          isLoadingHistory={false}
+                          error={null}
+                          narration={null}
+                          references={references}
+                          canRegenerate={false}
+                          onRegenerate={NO_OP}
+                          onRetry={NO_OP}
+                          showAuthors={false}
+                          viewerId={view.user_id}
+                          viewerUuid={owner?.uuid ?? view.user_uuid}
+                          redacted={view.is_redacted === true}
+                          masthead={null}
+                          underBar={false}
+                          onReply={null}
+                          flow
+                        />
+                      </div>
+                    </AdminSidePanel>
+                  </TurnFooterProvider>
+                </AgentChainProvider>
+              </BackgroundJobsProvider>
+          </HeldItemsSourceProvider>
+          </ToolResultSourceProvider>
         </V2SessionProvider>
       </ReadOnlyTranscript>
     </QueryClientProvider>

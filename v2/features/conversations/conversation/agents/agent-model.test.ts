@@ -64,7 +64,9 @@ test('an agent conversation opens in the chat’s side panel by its uuid', () =>
   for (const bad of ['agent:', 'agent:issue-spotter-1', 'agent:123', 'agent:../x']) assert.equal(parseSidePanelValue(bad), null, bad);
 
   const read = (...parts: string[]) => readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', ...parts), 'utf8');
-  // Each agent's card opens its conversation from its popover ("Open its conversation"; round 9, version 1).
+  // Each agent's card opens its conversation from its popover ("Open its conversation"; round 9, version 1),
+  // only where the page's panel shows agents (every chat page, and the admin view's read-only panel).
+  assert.match(read('agents', 'AgentRoster.tsx'), /\{panel\?\.shows\('agent'\) \? \(/);
   assert.match(read('agents', 'AgentRoster.tsx'), /panel\.open\(\{ kind: 'agent', id: node\.conversationId \}\);/);
 });
 

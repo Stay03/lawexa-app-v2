@@ -3,13 +3,13 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 import type { BackgroundJob } from '@/types/background-jobs';
+import { useCanAct } from '../read-only';
 import { backgroundJobsByMessage } from './model';
 import { useCancelBackgroundJob } from './mutations';
 
 interface BackgroundJobsValue {
   byMessage: ReadonlyMap<number, readonly BackgroundJob[]>;
-  /** Null where the reader may not cancel (the admin view, a snapshot). */
-  cancel: ((jobUuid: string) => void) | null;
+  cancel: (jobUuid: string) => void;
   /** The jobs whose cancel is on its way, whose buttons show the wait. */
   cancelling: ReadonlySet<string>;
 }
@@ -25,13 +25,10 @@ const BackgroundJobsContext = createContext<BackgroundJobsValue | null>(null);
 export function BackgroundJobsProvider({
   conversationId,
   jobs,
-  readOnly = false,
   children,
 }: {
   conversationId: string;
   jobs: readonly BackgroundJob[];
-  /** Show the jobs without Cancel: the admin view reads another person's chat. */
-  readOnly?: boolean;
   children: React.ReactNode;
 }) {
   const { mutate } = useCancelBackgroundJob(conversationId);
@@ -54,20 +51,25 @@ export function BackgroundJobsProvider({
     [mutate],
   );
   const value = useMemo<BackgroundJobsValue>(
-    () => ({ byMessage: backgroundJobsByMessage(jobs), cancel: readOnly ? null : cancel, cancelling }),
-    [jobs, readOnly, cancel, cancelling],
+    () => ({ byMessage: backgroundJobsByMessage(jobs), cancel, cancelling }),
+    [jobs, cancel, cancelling],
   );
   return <BackgroundJobsContext.Provider value={value}>{children}</BackgroundJobsContext.Provider>;
 }
 
-/** The jobs a message started, and how to cancel one; nothing outside a chat that provides them. */
+/**
+ * The jobs a message started, and how to cancel one; nothing outside a chat
+ * that provides them. Cancel is null where the reader may not act (useCanAct:
+ * the admin view, a reader who may not send).
+ */
 export function useBackgroundJobsOf(messageId: number | null): {
   jobs: readonly BackgroundJob[];
   cancel: ((jobUuid: string) => void) | null;
   cancelling: ReadonlySet<string>;
 } | null {
   const value = useContext(BackgroundJobsContext);
+  const canAct = useCanAct();
   if (!value || messageId === null) return null;
   const jobs = value.byMessage.get(messageId);
-  return jobs ? { jobs, cancel: value.cancel, cancelling: value.cancelling } : null;
+  return jobs ? { jobs, cancel: canAct ? value.cancel : null, cancelling: value.cancelling } : null;
 }

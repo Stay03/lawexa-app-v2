@@ -3,13 +3,13 @@
 import { useRef, useState } from 'react';
 import { FileText, Loader2, Mic, Pause, Play } from 'lucide-react';
 
-import { recordingsApi } from '@/lib/api/recordings';
 import { cn } from '@/lib/utils';
 import { formatFileSize } from '@/lib/utils/format-bytes';
 import type { RecordingMessageMeta } from '@/types/recording';
 import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { clock } from './recording-model';
+import { useHeldItemsSource } from '@/v2/features/conversations/conversation/held-items-source';
 
 /**
  * A recording where it was posted (thread ac47b1df; the card in the design
@@ -27,6 +27,8 @@ export function RecordingCard({ recording }: { recording: RecordingMessageMeta }
   const duration = recording.duration_seconds ?? 0;
   const title = (recording.audio_file?.name ?? 'Recording').replace(/\.[a-z0-9]+$/i, '');
 
+  // The owner's route, or the admin view's read of a recording its chat holds (held-items-source.ts).
+  const held = useHeldItemsSource();
   const play = async () => {
     setProblem(null);
     const element = audio.current;
@@ -38,7 +40,7 @@ export function RecordingCard({ recording }: { recording: RecordingMessageMeta }
     if (!element.src) {
       setLoading(true);
       try {
-        const answer = await recordingsApi.get(recording.recording_uuid);
+        const answer = await held.recording(recording.recording_uuid);
         const url = answer.data?.audio_url;
         if (!url) throw new Error('no address');
         element.src = url;

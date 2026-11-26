@@ -13,6 +13,7 @@ import { draftStatus, type DraftBlock } from './draft-blocks';
 import { markdownToDoc } from './markdown-to-doc';
 import { draftGroupKey, draftVersionLabel } from './draft-versions';
 import { useDraftEdited } from './use-draft-notes';
+import { useDraftNotesSource } from './draft-notes-source';
 import { notesQueries } from '@/v2/features/notes/queries';
 
 /**
@@ -71,8 +72,11 @@ export function DraftCard({
   // EDITED (drafts saved as notes): the reader changed the newest version in
   // its note, so Lawexa will work from their text.
   const chat = useV2ChatContext();
+  // The admin view names its chat through the draft notes' source (it has no chat context).
+  const source = useDraftNotesSource();
+  const conversationId = chat?.conversationId ?? source.conversationId ?? undefined;
   const queryClient = useQueryClient();
-  const edited = useDraftEdited(chat?.conversationId, key, Boolean(panel) && draft.complete && !older);
+  const edited = useDraftEdited(conversationId, key, Boolean(panel) && draft.complete && !older);
 
   // A DRAFT OPENS ITSELF WHEN LAWEXA FINISHES IT (Stay, 24 October 2026: "auto
   // open when its done"). The card saw it being written, and its closing tag

@@ -97,7 +97,7 @@ export function DraftSaveControl({ tools, note, autosave, space, onHistory }: Dr
           onHistory={onHistory}
         />
       ) : (
-        <DownloadMenu downloads={tools.downloads} />
+        <DownloadMenu downloads={tools.downloads} onHistory={onHistory} />
       )}
       {tools.downloads.failure ? (
         <div className="absolute top-full right-0 z-30 mt-1.5 w-64">
@@ -128,6 +128,13 @@ export function DraftSaveBar({ tools, note, autosave, space, onHistory }: DraftA
         ) : (
           // Short words so the row stays one row on a phone; the full name is the button's.
           <div className="flex items-center gap-2">
+            {/* Staff in the admin view read the owner's history here (the owner's has it in the note's menu). */}
+            {onHistory ? (
+              <button type="button" onClick={onHistory} className={cn(ACTION_PILL, FOCUS_RING)}>
+                <History aria-hidden className="size-4" />
+                History
+              </button>
+            ) : null}
             <DownloadPill downloads={tools.downloads} format="docx" label="Download Word" short="Word" />
             <DownloadPill downloads={tools.downloads} format="pdf" label="Download PDF" short="PDF" />
           </div>
@@ -275,7 +282,7 @@ export function DraftFolderPicker({
  * The computer's downloads where there is no note: the draft as Word or PDF,
  * made from the panel as it stands. It spins while a download runs.
  */
-function DownloadMenu({ downloads }: { downloads: DraftDownload }) {
+function DownloadMenu({ downloads, onHistory }: { downloads: DraftDownload; onHistory: (() => void) | null }) {
   const { download, downloading } = downloads;
   return (
     <DropdownMenu>
@@ -308,6 +315,13 @@ function DownloadMenu({ downloads }: { downloads: DraftDownload }) {
           Download PDF
           <DropdownMenuShortcut>.pdf</DropdownMenuShortcut>
         </DropdownMenuItem>
+        {/* Only where the panel offers a history with no note menu: staff reading the owner's note. */}
+        {onHistory ? (
+          <DropdownMenuItem onSelect={onHistory}>
+            <History aria-hidden className="size-4 text-foreground/62" />
+            Version history
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

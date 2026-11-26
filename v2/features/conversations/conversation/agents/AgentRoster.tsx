@@ -11,7 +11,7 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { conversationsQueries } from '../../queries';
-import { useV2ChatContext } from '../chat-context';
+import { useCanAct } from '../read-only';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { formatToolMessage } from '../tools/ToolStepItem';
 import type { ChainNode } from './agent-chain';
@@ -155,7 +155,8 @@ function useElapsed(startedAt: number | null): string | null {
 /** Lawexa's own line over the deck while its agents work, with Stop for all of them. */
 function LawexaLine({ rows, conversationId }: { rows: readonly ChainNode[]; conversationId: string }) {
   const { heldIds } = useChainHeld();
-  const canSend = useV2ChatContext()?.canSend ?? false;
+  // Stop for every agent writes: offered only where the reader may act in this chat (useCanAct, card e4b12be8).
+  const canAct = useCanAct();
   const { stop, stopping, problem } = useStopChain(conversationId, heldIds);
   const elapsed = useElapsed(deckStartedAt(rows));
   return (
@@ -166,7 +167,7 @@ function LawexaLine({ rows, conversationId }: { rows: readonly ChainNode[]; conv
         {problem ?? deckLine(rows, heldIds.length)}
       </span>
       {elapsed ? <span className="shrink-0 text-xs text-muted-foreground/70 tabular-nums">· {elapsed}</span> : null}
-      {canSend ? (
+      {canAct ? (
         <button
           type="button"
           onClick={() => void stop()}
@@ -463,7 +464,8 @@ function AgentPopover({ node, onTurnEnd, children }: { node: ChainNode; onTurnEn
         <ul className="flex w-full min-w-0 flex-col gap-[9px]">
           <PopoverRow node={node} level={0} onTurnEnd={onTurnEnd} />
         </ul>
-        {panel ? (
+        {/* Only where the page's panel shows agents (every chat page, and the admin view's read-only panel). */}
+        {panel?.shows('agent') ? (
           <button
             type="button"
             onClick={() => {

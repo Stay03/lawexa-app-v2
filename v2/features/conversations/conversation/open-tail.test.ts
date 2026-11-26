@@ -35,14 +35,16 @@ test('a cold open draws the newest first too: the two frames count from the firs
   // A chat with messages left to fill in sits at the bottom, so the older
   // messages filling in above never move the text the reader is looking at;
   // a chat drawn whole in its first frame keeps its layout.
-  assert.match(list, /const anchorBottom = openTail\.older\.length > 0;/);
+  // Not in `flow` (the admin view, read from its top), which draws whole in its first frame.
+  assert.match(list, /const anchorBottom = !flow && openTail\.older\.length > 0;/);
   assert.match(list, /anchorBottom && 'min-h-full justify-end'/);
 });
 
 test('the first scroll lands at the bottom before the browser paints', () => {
   assert.match(
     list,
-    /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(didInitialScrollRef\.current \|\| messages\.length === 0\) return;[\s\S]*?scrollOwn\(el, ownScrollTopRef, el\.scrollHeight\);\s*\}, \[messages\.length\]\);/,
+    // Except in `flow` (the admin view), which opens at the top.
+    /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(flow \|\| didInitialScrollRef\.current \|\| messages\.length === 0\) return;[\s\S]*?scrollOwn\(el, ownScrollTopRef, el\.scrollHeight\);\s*\}, \[messages\.length, flow\]\);/,
   );
 });
 

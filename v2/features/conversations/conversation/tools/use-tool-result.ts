@@ -2,11 +2,11 @@
 
 import { useQueries, useQuery } from '@tanstack/react-query';
 
-import { chatApi } from '@/lib/api/chat';
 import { parseToolResult } from '@/lib/utils/transform-api-messages';
 import type { ToolMessage } from '@/types/chat';
 import { GC_TIMES } from '@/v2/runtime/query';
 import { useV2ChatContext } from '../chat-context';
+import { useToolResultSource, type ToolResultSource } from './tool-result-source';
 
 /**
  * A step's result, fetched the first time the step is opened when the chat
@@ -19,8 +19,10 @@ import { useV2ChatContext } from '../chat-context';
  * the step with its result filled in, or the fetch's state while it runs.
  */
 export function useToolResult(message: ToolMessage, enabled: boolean) {
-  const conversationId = useV2ChatContext()?.conversationId ?? null;
-  const { needed, options } = toolResultQuery(conversationId, message, enabled);
+  // The chat context's chat, or the admin view's, read through its source (tool-result-source.ts).
+  const source = useToolResultSource();
+  const conversationId = useV2ChatContext()?.conversationId ?? source.conversationId;
+  const { needed, options } = toolResultQuery(conversationId, message, enabled, source);
   const query = useQuery(options);
 
   if (!needed) return { message, status: 'ready' as const, retry: query.refetch };
@@ -34,8 +36,9 @@ export function useToolResult(message: ToolMessage, enabled: boolean) {
  * step whose result is still loading comes back as it is (no data yet).
  */
 export function useToolResults(messages: ToolMessage[]): ToolMessage[] {
-  const conversationId = useV2ChatContext()?.conversationId ?? null;
-  const built = messages.map((message) => toolResultQuery(conversationId, message, message.toolStatus === 'complete'));
+  const source = useToolResultSource();
+  const conversationId = useV2ChatContext()?.conversationId ?? source.conversationId;
+  const built = messages.map((message) => toolResultQuery(conversationId, message, message.toolStatus === 'complete', source));
   const queries = useQueries({ queries: built.map(({ options }) => options) });
   return messages.map((message, index) => {
     const data = queries[index]?.data;
@@ -44,7 +47,7 @@ export function useToolResults(messages: ToolMessage[]): ToolMessage[] {
 }
 
 /** Whether a step's result is still to fetch, and the query that fetches it. */
-function toolResultQuery(conversationId: string | null, message: ToolMessage, enabled: boolean) {
+function toolResultQuery(conversationId: string | null, message: ToolMessage, enabled: boolean, source: ToolResultSource) {
   const ref = message.resultRef;
   const needed = !!ref && message.toolResult?.data == null && conversationId !== null;
   return {
@@ -52,7 +55,7 @@ function toolResultQuery(conversationId: string | null, message: ToolMessage, en
     options: {
       queryKey: ['tool-result', conversationId, ref?.messageId] as const,
       queryFn: async () => {
-        const response = await chatApi.getToolResult(conversationId as string, (ref as { messageId: number }).messageId);
+        const response = await source.read(conversationId as string, (ref as { messageId: number }).messageId);
         if (!response.success || !response.data) throw new Error(response.message || 'The result did not load.');
         return parseToolResult(response.data);
       },

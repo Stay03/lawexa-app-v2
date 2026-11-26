@@ -5,6 +5,7 @@ import { HydrationBoundary } from '@tanstack/react-query';
 import { SEO, getAppUrl } from '@/lib/constants/seo';
 import { fetchCaseForMetadata } from '@/lib/api/server';
 import { CaseScreen } from '@/v2/features/cases/detail/CaseScreen';
+import { ServerReadMark } from '@/v2/features/cases/detail/ServerReadMark';
 import { prefetchCaseDetailState } from '@/v2/features/cases/server';
 
 /**
@@ -110,6 +111,8 @@ export default async function V2CasePage({ params, searchParams }: CasePageProps
 
   return (
     <HydrationBoundary state={state}>
+      {/* The server's read counted no view: the screen counts the open from the browser (ServerReadMark). */}
+      {state ? <ServerReadMark slug={slug} searchQuery={searchQuery} /> : null}
       <CaseScreen slug={slug} initialSide={sidePanelSsrValue(search.side)} />
     </HydrationBoundary>
   );

@@ -26,6 +26,7 @@ import { AgentRoster } from './AgentRoster';
 import { agentConversationTopic, agentTranscriptRows, subAgentPlaces, subAgentReplyView, type AgentStepCall, type AgentTranscriptRow } from './agent-transcript';
 import { useChainEntry, useRosterReplyIds } from './context';
 import { agentChainQueries, agentConversationQueries } from './queries';
+import { useAgentPanelSource } from './agent-panel-source';
 import { useAgentStream } from './use-agent-stream';
 import { sendsOnEnter } from '@/lib/utils/enter-key';
 import { DictateButton } from '@/v2/features/dictation/DictateButton';
@@ -49,7 +50,9 @@ import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation
 export function AgentConversationPanel({ conversationId }: { conversationId: string }) {
   const { userId: viewerId } = useV2Session();
   const queryClient = useQueryClient();
-  const transcript = useQuery(conversationsQueries.detail({ conversationId, viewerId }));
+  // The owner's routes, or the admin view's snapshot of the same (agent-panel-source.ts).
+  const source = useAgentPanelSource();
+  const transcript = useQuery(source.transcript({ conversationId, viewerId }));
   const conversation = transcript.data;
   const parentId = conversation?.parent_conversation?.id ?? null;
   const entry = useChainEntry(conversationId);

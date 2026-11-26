@@ -35,6 +35,7 @@ import { isPdfFile } from '@/v2/features/files/viewable';
 import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { isPictureAttachment } from '../../attachment-rules';
 import { useV2ChatContext } from '../chat-context';
+import { useCanActForSelf } from '../read-only';
 import { isReading, readingAnnouncement, readingLine, readingPollDelay } from './reading-line';
 
 /**
@@ -413,13 +414,16 @@ function isTemplateFile(document: MessageAttachment): boolean {
  * becomes one of their own templates. The server refuses a confidential
  * chat's file (deleted after 24 hours), a redacted chat's (only the redacted
  * copy is kept), a wrong type, one too big, or one they already keep, and
- * its sentence is shown as it is.
+ * its sentence is shown as it is. It writes to the reader's own account, so
+ * a reader who may not send keeps it; only the admin view withholds it
+ * (useCanActForSelf).
  */
 function KeepAsTemplate({ document }: { document: MessageAttachment }) {
   const chat = useV2ChatContext();
+  const canActForSelf = useCanActForSelf();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
-  if (!chat?.conversationId) return null;
+  if (!canActForSelf || !chat?.conversationId) return null;
   const conversationId = chat.conversationId;
   const keep = async () => {
     setSaving(true);

@@ -12,12 +12,13 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { skillDraftErrorSentence, skillDraftKindLine, skillDraftStatusLine } from '@/lib/utils/skill-draft';
 import { skillDraftsApi } from '@/lib/api/skill-drafts';
+import { useHeldItemsSource } from '../held-items-source';
 import { mySkillsApi } from '@/lib/api/private-items';
 import type { SkillDraft, SkillDraftCard, SkillDraftStatus } from '@/types/skill-draft';
 import { privateItemsQueries } from '@/v2/features/private-items/queries';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2ChatContext } from '../chat-context';
-import { useReadOnlyTranscript } from '../read-only';
+import { useCanAct } from '../read-only';
 import { InstructionsDiff, InstructionsText } from './InstructionsDiff';
 
 /**
@@ -40,14 +41,16 @@ import { InstructionsDiff, InstructionsText } from './InstructionsDiff';
  */
 export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
   const chat = useV2ChatContext();
-  // Staff reading the person's chat see the choices, never press them (read-only.tsx).
-  const readOnly = useReadOnlyTranscript();
+  // Staff in the admin view, or a reader who may not send, see the choices and never press them (useCanAct).
+  const canAct = useCanAct();
   const [open, setOpen] = useState(false);
   const bodyId = useId();
 
+  // The owner's route, or the admin view's read of a draft its chat proposed (held-items-source.ts).
+  const held = useHeldItemsSource();
   const draft = useQuery({
     queryKey: ['skill-draft', card.draft],
-    queryFn: () => skillDraftsApi.get(card.draft),
+    queryFn: () => held.skillDraft(card.draft),
     enabled: open,
     retry: (count, error) => extractApiError(error).status >= 500 && count < 2,
     staleTime: 30_000,
@@ -133,7 +136,7 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
               <Button
                 type="button"
                 size="sm"
-                disabled={settle.isPending || chat?.canSend === false || readOnly}
+                disabled={settle.isPending || !canAct}
                 onClick={() => settle.mutate('mine')}
               >
                 {settle.isPending && settle.variables === 'mine' ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
@@ -144,7 +147,7 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
               type="button"
               size="sm"
               variant={canKeep ? 'secondary' : 'default'}
-              disabled={settle.isPending || chat?.canSend === false || readOnly}
+              disabled={settle.isPending || !canAct}
               onClick={() => settle.mutate('save')}
             >
               {settle.isPending && settle.variables === 'save' ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
@@ -154,7 +157,7 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
               type="button"
               size="sm"
               variant="secondary"
-              disabled={settle.isPending || chat?.canSend === false || readOnly}
+              disabled={settle.isPending || !canAct}
               onClick={() => settle.mutate('dismiss')}
             >
               Not now

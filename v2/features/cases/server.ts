@@ -161,8 +161,11 @@ function ssrKey(): string | null {
  * ROLLOUT ORDER: the API gets the key in `SSR_SHARED_KEYS` first, then this
  * server gets the same value in `LAWEXA_SSR_KEY` (`.env.example`).
  *
- * ONE VIEW PER LOAD, AS BEFORE. The hydrated entry is fresh for the detail's
- * own `reference` stale time, so the screen does not fetch again on mount.
+ * ONE VIEW PER LOAD, AS BEFORE, now counted by the browser: this read carries
+ * the prefetch header (no view), and the page marks the case as read ahead
+ * (`ServerReadMark`), so the screen sends its one `POST /cases/{slug}/view`
+ * with the visit's headers. The hydrated entry is fresh for the detail's own
+ * `reference` stale time, so the screen does not fetch again on mount.
  *
  * A cookie that is VALID for another account (sign-in as someone else in v1
  * without a full page load) renders that account's view of the case until
@@ -204,6 +207,11 @@ export async function prefetchCaseDetailState(
     const forward: Record<string, string> = {
       'X-Lawexa-SSR-Key': key,
       'X-Lawexa-Client-IP': ip,
+      // A read ahead of the open (CASE_PREFETCH_HEADER in lib/api/cases.ts, not imported into this server module):
+      // the API counts no view for it. The page then counts the open from the browser (ServerReadMark), whose
+      // view carries where the visit came from and the browser's facts (view-signals.ts), which this server
+      // cannot know (Backend, guest visit signals, 26 November 2026).
+      'X-Lawexa-Prefetch': '1',
     };
     const userAgent = incoming.get('user-agent');
     if (userAgent) {

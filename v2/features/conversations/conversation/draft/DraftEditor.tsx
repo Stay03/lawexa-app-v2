@@ -47,7 +47,6 @@ import { createCaseMentionStore } from '@/v2/features/notes/editor/mention-store
 import { draftMirrorQuery, noteMirrorKey } from '@/v2/features/notes/editor/draft-mirror';
 import { useNoteAutosave } from '@/v2/features/notes/editor/use-autosave';
 import { pickRestoreCandidate, useDraftMirrorWriter } from '@/v2/features/notes/editor/use-draft-mirror';
-import { notesQueries } from '@/v2/features/notes/queries';
 import type { NoteRecord } from '@/v2/features/notes/types';
 import { stripPastedPresentation } from '@/v2/features/notes/editor/paste-sanitizer';
 import { shortcutLabel, useIsMac } from '@/v2/features/notes/editor/shortcut-label';
@@ -80,6 +79,7 @@ import {
 } from './draft-flush';
 import { CATCH_UP_LIMIT_MS, draftNoteLine, type DraftNoteState } from './draft-note-state';
 import { markDraftEdited, useDraftNoteState } from './use-draft-notes';
+import { useDraftNotesSource } from './draft-notes-source';
 import { useV2ChatContext } from '../chat-context';
 import { DraftHistoryDialog } from './DraftHistoryDialog';
 import { findCardRoom } from './find-room';
@@ -170,11 +170,13 @@ export function DraftEditor({
     if (editing) clearDraftSuperseded(conversationId, ordinal, editedNote);
     else markDraftSuperseded(conversationId, ordinal, editedNote);
   }, [conversationId, ordinal, editedNote, editing]);
-  const text = draftNoteLine(state, waitedMs);
+  // Staff in the admin view read a snapshot of the owner's: lines about the owner, and nothing waits to catch up.
+  const staff = useDraftNotesSource().readOnly;
+  const text = draftNoteLine(state, waitedMs, staff ? 'staff' : 'owner');
   const action =
     state.kind === 'older'
       ? { label: 'Open latest', onPress: () => panel?.open({ kind: 'draft', ordinal: state.latestOrdinal }) }
-      : state.kind === 'unlisted' || (state.kind === 'catching-up' && waitedMs >= CATCH_UP_LIMIT_MS)
+      : state.kind === 'unlisted' || (!staff && state.kind === 'catching-up' && waitedMs >= CATCH_UP_LIMIT_MS)
         ? { label: 'Try again', onPress: retry }
         : null;
   return <DraftEditorFor {...props} noteState={state} line={text ? { text, action } : null} />;
@@ -232,7 +234,8 @@ function DraftEditorFor(props: DraftEditorProps) {
  */
 function DraftNoteOpen(props: DraftEditorProps & { noteId: number; canEdit: boolean; documentKey: string }) {
   const { userId: viewerId } = useV2Session();
-  const open = useQuery(notesQueries.draftNoteOpen({ id: props.noteId, viewerId }));
+  const source = useDraftNotesSource();
+  const open = useQuery(source.draftNoteOpen({ id: props.noteId, viewerId }));
   const [generation, setGeneration] = useState(0);
   if (!open.data && open.isPending) return <DraftEditorSkeleton versionSwitch={props.versionSwitch} />;
   if (!open.data) {
@@ -370,6 +373,7 @@ function DraftEditorBody({
   const queryClient = useQueryClient();
   const { userId: viewerId } = useV2Session();
   const chat = useV2ChatContext();
+  const notesSource = useDraftNotesSource();
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const record = mode.kind === 'note' ? mode.record : null;
@@ -556,10 +560,15 @@ function DraftEditorBody({
     return () => frame.removeEventListener('keydown', onKeyDown);
   }, [editor, mac, openFind]);
 
-  const note: DraftNoteRef | null = record ? { id: record.id, slug: record.slug } : null;
+  // Staff in the admin view: the downloads are made here from the text on screen (never the note's server export,
+  // which counts as the staff member's own use of the owner's note), no Open note and no Save to folder; the history
+  // reads the admin routes (draft-notes-source.ts), with no restore.
+  const staff = notesSource.readOnly;
+  const note: DraftNoteRef | null = record && !staff ? { id: record.id, slug: record.slug } : null;
   const saveState = savesToNote ? { ...autosave, onRetry: autosave.retry } : null;
-  // The history and restore need edit rights on the server (woz 6fcd3822): offered to an editor only.
-  const actions = { tools, note, autosave: saveState, space, onHistory: savesToNote ? () => setHistoryOpen(true) : null };
+  // The history and restore need edit rights on the server (woz 6fcd3822): offered to an editor only, and to staff to read.
+  const onHistory = savesToNote || (staff && record) ? () => setHistoryOpen(true) : null;
+  const actions = { tools, note, autosave: saveState, space, onHistory };
 
   return (
     // THE DRAFT SCROLLS IN ITS OWN AREA, between the bars at the top and Save

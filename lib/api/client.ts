@@ -1,8 +1,12 @@
 import axios from 'axios';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { getDeviceId, getCachedFingerprint } from '@/lib/utils/device-id';
+import { captureVisit, isViewRequest, startView, viewHeaders } from '@/lib/utils/view-signals';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// The visit's referrer and first page, read once per tab at the app's start (view-signals.ts).
+if (typeof window !== 'undefined') captureVisit();
 
 export const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api`,
@@ -29,12 +33,24 @@ apiClient.interceptors.request.use((config) => {
     config.headers['X-Fingerprint'] = fingerprint;
   }
 
+  // Opening a case, a statute or a note: where the visit came from and the browser (view-signals.ts).
+  if (typeof window !== 'undefined' && isViewRequest(config.method, config.url)) {
+    Object.assign(config.headers, viewHeaders());
+  }
+
   return config;
 });
 
 // Response interceptor - handle errors with smart redirect
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // A view the server recorded: time it until the reader leaves (read from each answer, never kept).
+    if (typeof window !== 'undefined' && isViewRequest(response.config.method, response.config.url)) {
+      const token = response.headers?.['x-view-token'];
+      if (typeof token === 'string' && token) startView(token, API_BASE_URL);
+    }
+    return response;
+  },
   async (error) => {
     if (error.response?.status === 401) {
       const authState = useAuthStore.getState();

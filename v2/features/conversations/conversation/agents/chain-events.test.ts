@@ -69,5 +69,7 @@ test('nothing about the agents sits above the message box: Stop and the queued c
   assert.match(deck, /\{problem \?\? deckLine\(rows, heldIds\.length\)\}/);
   // Lawexa's line (and so Stop) shows on the newest deck whenever the chain is open (review of 60ef98b8).
   assert.match(deck, /const lineShown = !parent && chainOpen && messageId !== null && messageId === newestCaller;/);
-  assert.match(deck, /\{canSend \? \(/);
+  // Lawexa's Stop for every agent asks the one rule for controls that write (useCanAct, card e4b12be8).
+  assert.match(deck, /const canAct = useCanAct\(\);/);
+  assert.match(deck, /\{canAct \? \(/);
 });

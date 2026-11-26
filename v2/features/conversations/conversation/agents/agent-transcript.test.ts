@@ -198,6 +198,8 @@ test("the panel draws its own sub-agents with the chat's roster, named for the a
     source,
     /places\.has\(index\) \? \(\s*<AgentRoster\s*messageId=\{places\.get\(index\) \?\? null\}\s*parent=\{\{ id: conversationId, depth: entry\?\.depth \?\? 1, name: agentName \?\? 'This agent' \}\}\s*\/>/,
   );
+  // The transcript is read through the panel's source: the owner's routes, or the admin view's snapshot (agent-panel-source.ts).
+  assert.match(source, /const transcript = useQuery\(source\.transcript\(\{ conversationId, viewerId \}\)\);/);
   assert.match(source, /subAgentReplyView\(row, useRosterReplyIds\(\)\)[\s\S]*?panel\.open\(\{ kind: 'agent', id: view\.openId \}\)[\s\S]*?Open its conversation/);
   const roster = readFileSync(join(dir, 'AgentRoster.tsx'), 'utf8');
   assert.match(roster, /aria-label=\{`Agents \$\{askedBy\} asked`\}/);

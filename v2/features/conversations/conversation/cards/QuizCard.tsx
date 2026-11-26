@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils';
 import type { QuizInfo } from '@/lib/utils/parse-quiz-xml';
 import { setQuizUnderWay } from '@/v2/features/chat-rating/store';
 import { useV2ChatContext } from '@/v2/features/conversations/conversation/chat-context';
+import { useCanAct } from '@/v2/features/conversations/conversation/read-only';
 import { useSavedMessageId } from '@/v2/features/conversations/conversation/markdown/document-export';
 import { QuestionFeedbackButton } from '@/v2/features/quiz/feedback/QuestionFeedbackButton';
 
@@ -239,6 +240,7 @@ interface QuizCardListProps {
 
 export function QuizCardList({ quizzes }: QuizCardListProps) {
   const chatContext = useV2ChatContext();
+  const canAct = useCanAct();
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, watchDrag: true });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -413,7 +415,7 @@ export function QuizCardList({ quizzes }: QuizCardListProps) {
         {!isSubmitted ? (
           <Button
             onClick={handleSubmitAnswers}
-            disabled={!allAnswered || !chatContext || chatContext.isStreaming || !chatContext.canSend}
+            disabled={!allAnswered || !canAct || !chatContext || chatContext.isStreaming}
             className="animate-in fade-in slide-in-from-bottom-2 gap-2 duration-300"
             size="lg"
           >

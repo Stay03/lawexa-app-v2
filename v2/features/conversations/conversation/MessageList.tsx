@@ -257,6 +257,13 @@ export interface MessageListProps {
   onReply?: ((target: MessageReplyTo) => void) | null;
   /** A message to scroll to and flash once the chat has opened (`/c/{id}?m={id}`). */
   jumpTo?: number | null;
+  /**
+   * A snapshot read in the page's own scroll, from its top (the admin view;
+   * Stay, thread 085a980c, 26 November 2026). The list keeps no scroller of its
+   * own and grows with its rows; it draws every row in its first frame, lands
+   * nowhere, follows nothing and shows no "Latest" pill.
+   */
+  flow?: boolean;
 }
 
 export function MessageList({
@@ -284,6 +291,7 @@ export function MessageList({
   viewerUuid = null,
   onReply = null,
   jumpTo = null,
+  flow = false,
 }: MessageListProps) {
   // A user turn's colour: its author's, or the reader's own for the row this
   // client drew. A withheld or missing author has none.
@@ -296,7 +304,9 @@ export function MessageList({
   // painted, the newest messages only; from then on, all of them. Everything
   // below reads this list, so the scroll and pill logic always describe what
   // is on the page.
-  const [showAll, setShowAll] = useState(false);
+  // Read from the top (`flow`), the chat draws whole at once: newest-first
+  // would paint the end of the chat where the reader starts at its beginning.
+  const [showAll, setShowAll] = useState(flow);
   // The transcript fades in only when this list mounted while the history was
   // still loading (a cold open: it replaces a skeleton). Opened from memory,
   // it fading in from 0 meant a blank page for a moment under a composer that
@@ -308,7 +318,7 @@ export function MessageList({
   // bottom of the scroller, so the older messages arriving above never move
   // the text the reader is looking at. A chat drawn whole in its first frame
   // keeps its top-down layout.
-  const anchorBottom = openTail.older.length > 0;
+  const anchorBottom = !flow && openTail.older.length > 0;
   const hasMessages = latestMessages.length > 0;
   useEffect(() => {
     // Counted from the first commit with messages (see OPEN_TAIL).
@@ -469,7 +479,8 @@ export function MessageList({
    * before a row mounts, or a turn still running, means that row parses whole.
    */
   const landsAtBottom = openDefersBlocks({
-    opened,
+    // A chat read from its top parses each answer whole: its first blocks are what the reader sees.
+    opened: opened || flow,
     scrolledUp: detachedAt !== null,
     turnRunning: isStreaming,
   });
@@ -557,12 +568,12 @@ export function MessageList({
   // conversation, so the next conversation gets its own first landing.
   const didInitialScrollRef = useRef(false);
   useIsomorphicLayoutEffect(() => {
-    if (didInitialScrollRef.current || messages.length === 0) return;
+    if (flow || didInitialScrollRef.current || messages.length === 0) return;
     const el = scrollRef.current;
     if (!el) return;
     didInitialScrollRef.current = true;
     scrollOwn(el, ownScrollTopRef, el.scrollHeight);
-  }, [messages.length]);
+  }, [messages.length, flow]);
 
   // When the rest of an opened chat arrives above the first frame's messages, a
   // reader still at the bottom stays there before the browser paints. Chrome's
@@ -706,7 +717,7 @@ export function MessageList({
 
   return (
     <div
-      className="relative flex min-h-0 flex-1 flex-col"
+      className={flow ? 'relative flex flex-col' : 'relative flex min-h-0 flex-1 flex-col'}
       data-v2-chat-list=""
       data-under-bar={underBar ? '' : undefined}
     >
@@ -714,13 +725,18 @@ export function MessageList({
         ref={scrollRef}
         onScroll={handleScroll}
         data-v2-chat-scroller=""
+        data-flow={flow ? '' : undefined}
         // `relative`: the transcript's own absolutely placed nodes (the author
         // line's sr-only "Asked by …") take THIS scroller as their containing
         // block, so it clips them. Without it they escaped to the next scroll
         // container, the shell's content region, and made it scroll: the whole
         // chat could be dragged up the screen (real-server pass 10, 13 October
         // 2026: the region at 3528 px in a 664 px view).
-        className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+        //
+        // In `flow` it is no scroller: the page scrolls, and every scroll the
+        // list would make (a landing, a follow, a kept place) writes to a box
+        // with nothing to scroll, so it moves nothing.
+        className={flow ? 'relative' : 'v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain'}
       >
         {/* Bottom padding clears the FLOATING composer that ConversationScreen lays
             over this scroll region (the pill is absolute/out-of-flow, so the transcript
@@ -731,7 +747,9 @@ export function MessageList({
         <div
           ref={contentRef}
           className={cn(
-            'mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6 pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]',
+            'mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6',
+            // Read in a page, the column is the page's own (it fills it), and no composer floats over it.
+            flow ? 'mx-0 max-w-none px-0 pb-6' : 'pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]',
             anchorBottom && 'min-h-full justify-end',
           )}
         >
@@ -847,35 +865,37 @@ export function MessageList({
       {/* Jump-to-latest pill — count of messages since detach (§5). Symmetric
           fade/slide both directions (standing rule #24). Its `bottom` clears the
           FLOATING composer (same `--v2-conv-dock-h` measure the transcript pads with),
-          so it rides just above the pill instead of behind it. */}
-      <div
-        aria-hidden={!showPill}
-        className={[
-          'pointer-events-none absolute bottom-[calc(var(--v2-conv-dock-h,7rem)+1rem)] left-1/2 -translate-x-1/2 transition-all duration-200 motion-reduce:transition-none',
-          showPill ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0',
-        ].join(' ')}
-      >
-        <Button
-          size="sm"
-          variant="secondary"
+          so it rides just above the pill instead of behind it. None in `flow`. */}
+      {!flow && (
+        <div
+          aria-hidden={!showPill}
           className={[
-            'v2-interactive h-9 gap-1.5 rounded-full px-3 shadow-lg',
-            showPill ? 'pointer-events-auto' : 'pointer-events-none',
+            'pointer-events-none absolute bottom-[calc(var(--v2-conv-dock-h,7rem)+1rem)] left-1/2 -translate-x-1/2 transition-all duration-200 motion-reduce:transition-none',
+            showPill ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0',
           ].join(' ')}
-          onClick={jumpToLatest}
-          tabIndex={showPill ? 0 : -1}
         >
-          <ArrowDown className="h-4 w-4" />
-          {/* Named, not counted, at one — "New message" is what the reader is
-              actually being told, and one is the common case now that a message
-              can arrive from another tab. */}
-          {pillCount === 0
-            ? 'Latest'
-            : pillCount === 1
-              ? 'New message'
-              : `${pillCount} new messages`}
-        </Button>
-      </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            className={[
+              'v2-interactive h-9 gap-1.5 rounded-full px-3 shadow-lg',
+              showPill ? 'pointer-events-auto' : 'pointer-events-none',
+            ].join(' ')}
+            onClick={jumpToLatest}
+            tabIndex={showPill ? 0 : -1}
+          >
+            <ArrowDown className="h-4 w-4" />
+            {/* Named, not counted, at one — "New message" is what the reader is
+                actually being told, and one is the common case now that a message
+                can arrive from another tab. */}
+            {pillCount === 0
+              ? 'Latest'
+              : pillCount === 1
+                ? 'New message'
+                : `${pillCount} new messages`}
+          </Button>
+        </div>
+      )}
 
       {/* One actions sheet for the transcript, opened by a long press on a
           question (touch). Only where the reader can reply. */}
