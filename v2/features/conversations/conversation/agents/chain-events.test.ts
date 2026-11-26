@@ -67,5 +67,7 @@ test('nothing about the agents sits above the message box: Stop and the queued c
   const deck = here('features', 'conversations', 'conversation', 'agents', 'AgentRoster.tsx');
   assert.match(deck, /const \{ stop, stopping, problem \} = useStopChain\(conversationId, heldIds\);/);
   assert.match(deck, /\{problem \?\? deckLine\(rows, heldIds\.length\)\}/);
-  assert.match(deck, /\{open && canSend \? \(/);
+  // Lawexa's line (and so Stop) shows on the newest deck whenever the chain is open (review of 60ef98b8).
+  assert.match(deck, /const lineShown = !parent && chainOpen && messageId !== null && messageId === newestCaller;/);
+  assert.match(deck, /\{canSend \? \(/);
 });

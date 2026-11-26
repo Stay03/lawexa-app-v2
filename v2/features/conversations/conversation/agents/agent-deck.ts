@@ -119,8 +119,12 @@ const agents = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
  */
 export function deckLine(rows: readonly Pick<ChainNode, 'state' | 'name'>[], held = 0): string {
   const open = rows.filter((row) => !settled(row));
+  // All it asked have finished, yet the chain is open: a helper further down still works, or the turn that reads
+  // the replies has not started (review of 60ef98b8).
   const base =
-    open.length === rows.length && rows.length > 1
+    open.length === 0
+      ? 'Finishing up'
+      : open.length === rows.length && rows.length > 1
       ? `${agents(rows.length)} at work`
       : open.length === 1
         ? `Waiting for ${open[0].name}`

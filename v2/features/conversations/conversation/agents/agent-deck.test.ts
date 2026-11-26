@@ -74,6 +74,7 @@ test('Lawexa’s line counts who it still waits for, and the queued messages', (
   assert.equal(deckLine(five.map((n, i) => row(n, i < 2 ? 'replied' : i === 2 ? 'waiting' : 'running'))), 'Waiting for 3 agents');
   assert.equal(deckLine(five.map((n, i) => row(n, i === 4 ? 'running' : 'replied'))), 'Waiting for Risk Reviewer');
   assert.equal(deckLine([row('Issue Spotter', 'running')]), 'Waiting for Issue Spotter');
+  assert.equal(deckLine([row('Issue Spotter', 'failed'), row('Case Finder', 'replied')]), 'Finishing up');
   assert.equal(deckLine(five.map((n) => row(n, 'running')), 1), '5 agents at work · 1 message queued');
   assert.equal(deckLine(five.map((n) => row(n, 'running')), 2), '5 agents at work · 2 messages queued');
 });

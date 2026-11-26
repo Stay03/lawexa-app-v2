@@ -1153,11 +1153,16 @@ export function useConversationController(
   useEffect(() => {
     streamingNowRef.current = isStreaming;
   }, [isStreaming]);
+  // The same answer arrives more than once: Stop lands it here, and the server pushes it (twice for a Space's
+  // owner: their own channel and the Space's). One follow per turn (review of 60ef98b8).
+  const followedAnswerRef = useRef<string | null>(null);
   useEffect(
     () =>
       onHeldMessagesAnswered((event) => {
         if (event.conversation_id !== conversationId) return;
         releaseHeld(event.message_ids);
+        if (followedAnswerRef.current === event.execution_id) return;
+        followedAnswerRef.current = event.execution_id;
         if (!streamingNowRef.current) followResumedTurn(event.execution_id);
       }),
     [conversationId, releaseHeld, followResumedTurn],

@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Check, CircleAlert, Loader2, Square } from 'lucide-react';
 import { ThinkingOrb } from 'thinking-orbs';
 
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils';
@@ -52,6 +52,16 @@ export function AgentRoster({ messageId, parent }: { messageId: number | null; p
   const chatId = held?.conversationId ?? null;
   const queryClient = useQueryClient();
   const [opened, setOpened] = useState(false);
+  const { open: chainOpen, newestCaller } = useChainHeld();
+  // After Show or Hide, the control that replaced the pressed one takes the focus (it unmounts the pressed one).
+  const focusNext = useRef(false);
+  const showRef = useRef<HTMLButtonElement>(null);
+  const hideRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!focusNext.current) return;
+    focusNext.current = false;
+    (opened ? hideRef : showRef).current?.focus();
+  }, [opened]);
 
   // A streamed turn ended (replied, stopped, or failed): the chain moves the row on, and the jobs move on too.
   const onTurnEnd = useCallback(() => {
@@ -65,23 +75,32 @@ export function AgentRoster({ messageId, parent }: { messageId: number | null; p
   const rows = held.rows;
   const askedBy = parent?.name ?? 'Lawexa';
   const done = rows.every(settled);
+  // Lawexa's line, with the chain's Stop and queued count, sits on the chat's newest deck for as long as the chain
+  // is open, even once the agents it asked have finished (a helper further down may still work), and on no other
+  // deck (review of 60ef98b8). A deck with that line never folds.
+  const lineShown = !parent && chainOpen && messageId !== null && messageId === newestCaller;
+  const toggle = (next: boolean) => {
+    focusNext.current = true;
+    setOpened(next);
+  };
 
-  if (done && !opened) {
-    return <FoldedDeck rows={rows} askedBy={askedBy} onShow={() => setOpened(true)} />;
+  if (done && !lineShown && !opened) {
+    return <FoldedDeck ref={showRef} rows={rows} askedBy={askedBy} onShow={() => toggle(true)} />;
   }
   return (
     <section aria-label={`Agents ${askedBy} asked`} className="flex flex-col gap-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-      {done ? (
+      {lineShown ? (
+        <LawexaLine rows={rows} conversationId={chatId} />
+      ) : done ? (
         <button
+          ref={hideRef}
           type="button"
-          onClick={() => setOpened(false)}
+          onClick={() => toggle(false)}
           className={cn('v2-interactive w-fit rounded-sm text-xs font-semibold text-muted-foreground hover:text-foreground', FOCUS_RING)}
         >
           Hide the agents
         </button>
-      ) : parent ? null : (
-        <LawexaLine rows={rows} conversationId={chatId} />
-      )}
+      ) : null}
       <ul className="flex flex-col gap-2">
         {rows.map((row) => (
           <DeckCard key={row.conversationId} node={row} onTurnEnd={onTurnEnd} />
@@ -112,7 +131,7 @@ function useElapsed(startedAt: number | null): string | null {
 
 /** Lawexa's own line over the deck while its agents work, with Stop for all of them. */
 function LawexaLine({ rows, conversationId }: { rows: readonly ChainNode[]; conversationId: string }) {
-  const { open, heldIds } = useChainHeld();
+  const { heldIds } = useChainHeld();
   const canSend = useV2ChatContext()?.canSend ?? false;
   const { stop, stopping, problem } = useStopChain(conversationId, heldIds);
   const elapsed = useElapsed(deckStartedAt(rows));
@@ -124,7 +143,7 @@ function LawexaLine({ rows, conversationId }: { rows: readonly ChainNode[]; conv
         {problem ?? deckLine(rows, heldIds.length)}
       </span>
       {elapsed ? <span className="shrink-0 text-xs text-muted-foreground/70 tabular-nums">· {elapsed}</span> : null}
-      {open && canSend ? (
+      {canSend ? (
         <button
           type="button"
           onClick={() => void stop()}
@@ -144,10 +163,21 @@ function LawexaLine({ rows, conversationId }: { rows: readonly ChainNode[]; conv
 }
 
 /** All finished: one green line with every face, the count, and Show. */
-function FoldedDeck({ rows, askedBy, onShow }: { rows: readonly ChainNode[]; askedBy: string; onShow: () => void }) {
+function FoldedDeck({
+  rows,
+  askedBy,
+  onShow,
+  ref,
+}: {
+  rows: readonly ChainNode[];
+  askedBy: string;
+  onShow: () => void;
+  ref?: React.Ref<HTMLButtonElement>;
+}) {
   const allReplied = rows.every((row) => row.state === 'replied');
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onShow}
       aria-label={`${foldLine(rows)}. Show the agents ${askedBy} asked`}
@@ -226,8 +256,9 @@ const TONE_TEXT: Record<CardTone, string> = {
 };
 
 function CardFace({ node, status }: { node: ChainNode; status: CardStatus }) {
+  // Spans, not divs: the face sits inside the card's button.
   return (
-    <div
+    <span
       className={cn(
         'relative z-[3] flex min-w-0 items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left transition-colors duration-300',
         status.tone === 'done'
@@ -242,7 +273,7 @@ function CardFace({ node, status }: { node: ChainNode; status: CardStatus }) {
         <span className="truncate text-[13.5px] font-semibold text-foreground">{node.name}</span>
         <StatusText status={status} />
       </span>
-    </div>
+    </span>
   );
 }
 
@@ -286,23 +317,26 @@ function Helpers({ nodes, level, parentDone, onTurnEnd }: { nodes: readonly Chai
 function HelperSlip({ node, status, level, tucked }: { node: ChainNode; status: CardStatus; level: number; tucked: boolean }) {
   const inset = { marginLeft: `${level * 10}px`, marginRight: `${level * 10}px`, zIndex: 3 - level };
   if (tucked) {
+    const tone = status.tone === 'done' ? 'done' : status.tone === 'failed' ? 'failed' : 'quiet';
     return (
-      <div
+      <span
         style={inset}
         className={cn(
           'relative -mt-2.5 flex h-7 items-end justify-end rounded-b-xl px-3 pb-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
           status.tone === 'done' ? 'bg-emerald-50 ring-1 ring-emerald-600/20 dark:bg-emerald-950' : 'bg-muted ring-1 ring-border',
         )}
       >
-        <span className={cn('flex items-center gap-1 text-[10px] font-semibold', TONE_TEXT[status.tone === 'done' ? 'done' : 'quiet'])}>
+        <span className={cn('flex items-center gap-1 text-[10px] font-semibold', TONE_TEXT[tone])}>
           <Face initials={agentInitials(node.name)} tone={status.tone} size="xs" />
           {node.name}
+          {/* A tucked helper that could not reply says so, not only in colour. */}
+          {status.tone === 'failed' ? <span className="font-normal">· {status.words}</span> : null}
         </span>
-      </div>
+      </span>
     );
   }
   return (
-    <div
+    <span
       style={inset}
       className={cn(
         'relative -mt-3 flex min-w-0 items-center gap-2 rounded-b-xl px-3 pt-[18px] pb-2 motion-safe:animate-in motion-safe:slide-in-from-top-3 motion-safe:fade-in motion-safe:duration-300',
@@ -312,7 +346,7 @@ function HelperSlip({ node, status, level, tucked }: { node: ChainNode; status: 
       <Face initials={agentInitials(node.name)} tone={status.tone} size="xs" />
       <span className="shrink-0 text-xs font-semibold text-foreground">{node.name}</span>
       <StatusText status={status} small />
-    </div>
+    </span>
   );
 }
 
@@ -356,6 +390,9 @@ const HOVER_CLOSE_MS = 200;
 function AgentPopover({ node, onTurnEnd, children }: { node: ChainNode; onTurnEnd: () => void; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Focus moves into the popover only when a keyboard opened it; a pointer (a hover above all) must never pull
+  // the focus out of the message box.
+  const byKeyboard = useRef(false);
   const panel = useSidePanel();
   useEffect(
     () => () => {
@@ -371,31 +408,43 @@ function AgentPopover({ node, onTurnEnd, children }: { node: ChainNode; onTurnEn
   // Opens only for a pointer that moves onto the card: a card drawn under a resting pointer (Show pressed, the
   // deck opening under it) is not a hover (fixture pictures, 26 November 2026).
   const moved = (event: React.PointerEvent) => {
-    if (open || (event.movementX === 0 && event.movementY === 0)) return;
+    if (event.pointerType !== 'mouse' || (event.movementX === 0 && event.movementY === 0)) return;
+    // Back on the card from its open popover: keep it open (clear the close the leave started).
+    if (open) {
+      if (timer.current) clearTimeout(timer.current);
+      return;
+    }
     hover(event, true);
   };
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverAnchor asChild>
+      {/* The trigger: a tap opens and closes it, Enter or Space opens it with the focus inside (so a keyboard
+          reaches Stop and Open its conversation), and its name is what it shows: the agent and its line. */}
+      <PopoverTrigger asChild>
         <button
           type="button"
-          onClick={() => setOpen((was) => !was)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') byKeyboard.current = true;
+          }}
+          onPointerDown={() => {
+            byKeyboard.current = false;
+          }}
           onPointerMove={moved}
           onPointerLeave={(event) => hover(event, false)}
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-label={`${node.name}: what it is doing`}
           className={cn('v2-interactive block w-full min-w-0 rounded-2xl text-left', FOCUS_RING)}
         >
           {children}
         </button>
-      </PopoverAnchor>
+      </PopoverTrigger>
       <PopoverContent
         align="start"
         sideOffset={6}
         onPointerEnter={(event) => hover(event, true)}
         onPointerLeave={(event) => hover(event, false)}
-        onOpenAutoFocus={(event) => event.preventDefault()}
+        onOpenAutoFocus={(event) => {
+          if (!byKeyboard.current) event.preventDefault();
+          byKeyboard.current = false;
+        }}
         className="w-80 max-w-[calc(100vw-2rem)] p-3"
       >
         <ul className="flex flex-col gap-2">

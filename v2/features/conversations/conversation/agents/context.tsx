@@ -85,14 +85,23 @@ export function useRosterReplyIds(): ReadonlySet<number> {
 }
 
 /**
- * The chain's open state and its held messages, for Lawexa's line over the
- * deck ("… · 1 message queued") and its Stop. Empty outside a chat with a chain.
+ * The chain's open state, its held messages and its newest calling turn, for
+ * Lawexa's line over the deck ("… · 1 message queued") and its Stop. Empty
+ * outside a chat with a chain.
  */
-export function useChainHeld(): { open: boolean; heldIds: readonly number[] } {
+export function useChainHeld(): { open: boolean; heldIds: readonly number[]; newestCaller: number | null } {
   const value = useContext(AgentChainContext);
   const chain = value?.chain ?? null;
-  return useMemo(
-    () => ({ open: chain?.chain_open === true, heldIds: chain?.held_messages.map((held) => held.id) ?? [] }),
-    [chain],
-  );
+  return useMemo(() => {
+    // The chat's newest turn that asked agents: Lawexa's line, with the chain's Stop, sits on its deck alone.
+    const callers = (chain?.agents ?? [])
+      .filter((entry) => entry.depth === 1)
+      .map((entry) => entry.latest_call?.called_by_message_id ?? null)
+      .filter((id): id is number => id !== null);
+    return {
+      open: chain?.chain_open === true,
+      heldIds: chain?.held_messages.map((held) => held.id) ?? [],
+      newestCaller: callers.length ? Math.max(...callers) : null,
+    };
+  }, [chain]);
 }

@@ -302,3 +302,16 @@ test('the side panel streams the agent’s reply, with Stop in its write box', (
   assert.match(panel, /aria-label=\{`Stop \$\{conversation\.agent\.name\}`\}/);
   assert.match(panel, /void chatApi\.cancelStream\(running, token\);/);
 });
+
+test('one stream per running turn, shared by its card, popover and panel; the popover is a real trigger', () => {
+  // Review of 60ef98b8: each card, popover and panel opened its own stream (15 for five agents with helpers).
+  const stream = here('agents', 'use-agent-stream.ts');
+  assert.match(stream, /const turns = new Map<string, SharedTurn>\(\);/);
+  assert.match(stream, /useSyncExternalStore\(/);
+  assert.match(stream, /turn\.onEnds\.set\(onEnd, \(turn\.onEnds\.get\(onEnd\) \?\? 0\) \+ 1\);/);
+  // A keyboard reaches Stop and Open its conversation: a trigger, focus inside only when a keyboard opened it.
+  const deck = here('agents', 'AgentRoster.tsx');
+  assert.match(deck, /<PopoverTrigger asChild>/);
+  assert.doesNotMatch(deck, /PopoverAnchor|aria-label=\{`\$\{node\.name\}/);
+  assert.match(deck, /if \(!byKeyboard\.current\) event\.preventDefault\(\);/);
+});
