@@ -56,6 +56,17 @@ test('each state has its line and its tone', () => {
   assert.equal(cardStatus({ ...base, state: 'running' }, { steps: [], writing: true }, wordsOf).tone, 'working');
 });
 
+test('a running agent with no turn to follow says what is true, without a spinner', () => {
+  const base = { replySummary: null, waitingFor: null, executionId: null };
+  // Its helper replied and it has not been woken to read the reply yet (Backend's three-deep run).
+  assert.deepEqual(cardStatus({ ...base, state: 'running', children: [{ name: 'Case Finder', state: 'replied' }] }, null, wordsOf), { words: 'Case Finder replied', tone: 'waiting' });
+  // Not started, or a helper still out: no claim of work.
+  assert.deepEqual(cardStatus({ ...base, state: 'running', children: [] }, null, wordsOf), { words: 'Starting', tone: 'waiting' });
+  assert.deepEqual(cardStatus({ ...base, state: 'running', children: [{ name: 'Case Finder', state: 'replied' }, { name: 'Law Checker', state: 'running' }] }, null, wordsOf), { words: 'Starting', tone: 'waiting' });
+  // With a turn to follow, the stream's words as before.
+  assert.equal(cardStatus({ ...base, executionId: 'exec-1', state: 'running' }, { steps: [], writing: true }, wordsOf).words, 'Writing its reply');
+});
+
 test('Lawexa’s line counts who it still waits for, and the queued messages', () => {
   const row = (name: string, state: 'running' | 'waiting' | 'replied' | 'stopped' | 'failed') => ({ name, state });
   const five = ['Issue Spotter', 'Case Finder', 'Damages Estimator', 'Drafter', 'Risk Reviewer'];

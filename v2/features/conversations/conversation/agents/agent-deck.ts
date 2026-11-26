@@ -70,10 +70,29 @@ export function workingWords(live: CardLive | null, wordsOf: StepWords): string 
   return 'Reading the question';
 }
 
+/**
+ * A running agent with no turn to follow (no execution_id): its helper has
+ * replied and it has not been woken to read the reply yet, or it has not
+ * started. The card says what is true, without a spinner, rather than a frozen
+ * "Reading the question" (Backend's three-deep run, 26 November 2026: on live a
+ * sweep wakes it within about 15 minutes).
+ */
+function notRunningWords(children: readonly Pick<ChainNode, 'state' | 'name'>[]): string {
+  const replied = children.filter((child) => child.state === 'replied');
+  const last = replied[replied.length - 1];
+  if (last && children.every(settled)) return `${last.name} replied`;
+  return 'Starting';
+}
+
+type CardNode = Pick<ChainNode, 'state' | 'replySummary' | 'waitingFor'> &
+  Partial<Pick<ChainNode, 'executionId'>> & { children?: readonly Pick<ChainNode, 'state' | 'name'>[] };
+
 /** A card's line for its agent's state. */
-export function cardStatus(node: Pick<ChainNode, 'state' | 'replySummary' | 'waitingFor'>, live: CardLive | null, wordsOf: StepWords): CardStatus {
+export function cardStatus(node: CardNode, live: CardLive | null, wordsOf: StepWords): CardStatus {
   switch (node.state) {
     case 'running':
+      // Known to have no turn running: no stream to follow.
+      if (node.executionId === null && live === null) return { words: notRunningWords(node.children ?? []), tone: 'waiting' };
       return { words: workingWords(live, wordsOf), tone: 'working' };
     case 'waiting':
       return { words: node.waitingFor ? `With ${node.waitingFor}` : 'Waiting for its helper', tone: 'waiting' };
