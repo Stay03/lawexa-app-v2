@@ -8,7 +8,7 @@ import { apiClient } from '@/lib/api/client';
 import { CASE_PREFETCH_HEADER } from '@/lib/api/cases';
 import type { CaseDetailResponse } from '@/types/case';
 import { caseDetailState } from './case-prefetch-state';
-import { countOpen } from './case-view';
+import { countOpen, noteReadAhead, takeUncountedOpen } from './case-view';
 import { casesQueries, searchTermOf } from './queries';
 
 /* One view per case open (the techlead's counts, 17 October 2026): a phone tap
@@ -118,15 +118,24 @@ test('a direct load without the server key: the page makes one counted read and 
   assert.deepEqual(sent, [{ kind: 'read', url: '/cases/nokey-case' }]);
 });
 
-test('a direct load with the server key: the server reads as the reader, with no prefetch header', () => {
-  // So the API counts that read as the open's one view, under the reader's
-  // own account (its bearer token), with the reader's address and browser
-  // forwarded under the shared key (backend a0020709).
+test('a direct load with the server key: the server reads as the reader, as a read ahead, and the browser counts the view', () => {
+  // The server reads under the reader's own account (its bearer token), with
+  // the reader's address and browser forwarded under the shared key (backend
+  // a0020709). Since the guest visit signals (Backend, 26 November 2026) it
+  // sends the prefetch header, so the API counts no view for it: the page
+  // marks the case as read ahead (ServerReadMark) and the screen counts the
+  // open from the browser, whose view carries where the visit came from.
   const server = readFileSync(join(here, 'server.ts'), 'utf8');
   const read = server.slice(server.indexOf('export async function prefetchCaseDetailState'));
   assert.match(read, /apiFetch<CaseDetailResponse>\(`\/cases\/\$\{encodeURIComponent\(slug\)\}\?\$\{query\.toString\(\)\}`/);
   assert.match(read, /'X-Lawexa-SSR-Key': key,\s*'X-Lawexa-Client-IP': ip,/);
-  assert.doesNotMatch(read, /X-Lawexa-Prefetch|CASE_PREFETCH_HEADER|prefetch: true/);
+  assert.match(read, /'X-Lawexa-Prefetch': '1',/);
+  // The mark runs before the screen's effects, so the screen's countOpen finds it.
+  const mark = readFileSync(join(here, 'detail', 'ServerReadMark.tsx'), 'utf8');
+  assert.match(mark, /useLayoutEffect\(\(\) => \{\s*noteReadAhead\(slug, searchTermOf\(searchQuery\)\);/);
+  noteReadAhead('ssr-case', undefined);
+  assert.equal(takeUncountedOpen('ssr-case', undefined), true, 'the first draw sends the view');
+  assert.equal(takeUncountedOpen('ssr-case', undefined), false, 'and only once');
   const apiServer = readFileSync(join(here, '..', '..', 'runtime', 'api-server.ts'), 'utf8');
   assert.match(apiServer, /const token = await getSessionToken\(\);/);
   assert.match(apiServer, /headers\.set\('Authorization', `Bearer \$\{token\}`\);/);
