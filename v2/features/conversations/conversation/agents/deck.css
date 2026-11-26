@@ -32,7 +32,9 @@
   --deck-idle-hi: #f0ece5;
   --deck-idle-lo: #dcd6cc;
   --deck-spin-track: #ead9b2;
-  --deck-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Ease in and out (a standard curve, no overshoot): a strong ease-out did most of a move in its first 80 ms, so
+     it read as a cut on screen (frame samples, 26 November 2026). */
+  --deck-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* The same deck at night: the mock's roles on the app's dark ground. */
@@ -213,7 +215,8 @@
   gap: 8px;
   margin: -12px 10px 0;
   padding: 18px 12px 8px;
-  min-height: 44px;
+  /* A set height (not auto), so the tuck to 28px is a motion. */
+  height: 46px;
   border-radius: 0 0 12px 12px;
   background: var(--deck-gold-wash);
   box-shadow: 0 0 0 1px var(--deck-gold-edge);
@@ -221,12 +224,11 @@
   overflow: hidden;
   text-align: left;
   transition:
-    margin 0.3s var(--deck-ease),
-    padding 0.3s var(--deck-ease),
-    min-height 0.3s var(--deck-ease),
-    height 0.3s var(--deck-ease),
-    background 0.3s var(--deck-ease),
-    box-shadow 0.3s var(--deck-ease);
+    margin 0.45s var(--deck-ease),
+    padding 0.45s var(--deck-ease),
+    height 0.45s var(--deck-ease),
+    background 0.45s var(--deck-ease),
+    box-shadow 0.45s var(--deck-ease);
 }
 
 .v2-deck-slip.is-l2 {
@@ -251,7 +253,6 @@
 /* Tucked back to a thin green edge, with only its face and name at the right. */
 .v2-deck-slip.is-tucked {
   margin-top: -10px;
-  min-height: 0;
   height: 28px;
   padding: 10px 12px 0;
   justify-content: flex-end;
@@ -377,25 +378,26 @@
 
 /* ── Motion: short, eased, no bounce ────────────────────────────────────── */
 
-/* A helper is asked: its card slides out from under its asker's. */
+/* A helper is asked: its card slides out from under its asker's, and the room for it opens as it comes (the
+   cards below move down with it, never at once). Backwards fill only, so the tuck's transition owns the height
+   after. */
 .v2-deck-slip.is-arriving {
-  animation: v2-deck-slide-out 0.32s var(--deck-ease) both;
+  animation: v2-deck-slide-out 0.48s var(--deck-ease) backwards;
 }
 
 @keyframes v2-deck-slide-out {
   from {
-    transform: translateY(-70%);
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    transform: translateY(-60%);
     opacity: 0.4;
-  }
-  to {
-    transform: none;
-    opacity: 1;
   }
 }
 
 /* A line that changes fades in over the old. */
 .v2-deck-fade {
-  animation: v2-deck-fade 0.3s var(--deck-ease) both;
+  animation: v2-deck-fade 0.35s var(--deck-ease) both;
 }
 
 @keyframes v2-deck-fade {
@@ -404,9 +406,60 @@
   }
 }
 
-/* Every agent replied: the deck draws together before the folded line takes its place. */
+/* The deck's room: a grid row that closes as the deck folds and opens as it unfolds, so the page around it moves
+   with it. */
+.v2-deck-body {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.v2-deck-body > .v2-deck-stack {
+  min-height: 0;
+}
+
+.v2-deck-body.is-folding {
+  animation: v2-deck-close 0.4s var(--deck-ease) 0.6s both;
+}
+
+.v2-deck-body.is-unfolding {
+  animation: v2-deck-open 0.48s var(--deck-ease) backwards;
+}
+
+.v2-deck-body.is-folding > .v2-deck-stack,
+.v2-deck-body.is-unfolding > .v2-deck-stack {
+  overflow: hidden;
+}
+
+@keyframes v2-deck-close {
+  to {
+    grid-template-rows: 0fr;
+  }
+}
+
+@keyframes v2-deck-open {
+  from {
+    grid-template-rows: 0fr;
+  }
+}
+
+/* Lawexa's line (26px, then the section's 12px gap) closes as the deck holds, instead of leaving at once. */
+.v2-deck-line-gone {
+  display: block;
+  height: 26px;
+  animation: v2-deck-line-gone 0.4s var(--deck-ease) both;
+}
+
+@keyframes v2-deck-line-gone {
+  to {
+    height: 0;
+    margin-bottom: -12px;
+  }
+}
+
+/* Every agent replied: the green deck holds for 0.6 s, so the replies are seen, then draws together before the
+   folded line takes its place. */
 .v2-deck-stack.is-folding {
-  animation: v2-deck-fold-away 0.26s var(--deck-ease) both;
+  animation: v2-deck-fold-away 0.4s var(--deck-ease) 0.6s both;
   transform-origin: top left;
 }
 
@@ -418,7 +471,7 @@
 }
 
 .v2-deck-fold.is-arriving {
-  animation: v2-deck-fold-in 0.24s var(--deck-ease) both;
+  animation: v2-deck-fold-in 0.3s var(--deck-ease) both;
   transform-origin: left center;
 }
 
@@ -431,8 +484,8 @@
 
 /* Show: the cards unfold one after another. */
 .v2-deck-stack.is-unfolding > * {
-  animation: v2-deck-unfold 0.28s var(--deck-ease) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+  animation: v2-deck-unfold 0.4s var(--deck-ease) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
 }
 
 @keyframes v2-deck-unfold {
@@ -445,6 +498,9 @@
 /* Reduced motion: no movement; the animations still end (1 ms), so the fold still lands. */
 @media (prefers-reduced-motion: reduce) {
   .v2-deck-slip.is-arriving,
+  .v2-deck-body.is-folding,
+  .v2-deck-line-gone,
+  .v2-deck-body.is-unfolding,
   .v2-deck-fade,
   .v2-deck-stack.is-folding,
   .v2-deck-fold.is-arriving,

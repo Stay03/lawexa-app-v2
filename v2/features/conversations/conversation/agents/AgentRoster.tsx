@@ -100,7 +100,8 @@ export function AgentRoster({ messageId, parent }: { messageId: number | null; p
     <section aria-label={`Agents ${askedBy} asked`} className="v2-deck flex flex-col gap-3">
       {lineShown ? (
         <LawexaLine rows={rows} conversationId={chatId} />
-      ) : done ? (
+      ) : done && opened ? (
+        // Only on a deck the reader opened: a deck folding by itself shows no Hide (it would flash for the fold).
         <button
           ref={hideRef}
           type="button"
@@ -109,17 +110,23 @@ export function AgentRoster({ messageId, parent }: { messageId: number | null; p
         >
           Hide the agents
         </button>
+      ) : folding && !parent ? (
+        // Lawexa's line has gone with the last reply: its room closes with the fold, so the deck does not jump up.
+        <span aria-hidden className="v2-deck-line-gone" />
       ) : null}
-      <ul
-        className={cn('v2-deck-stack', folding && 'is-folding', opened && !folding && 'is-unfolding')}
-        onAnimationEnd={(event) => {
-          if (event.target === event.currentTarget && event.animationName === 'v2-deck-fold-away') setLanded(foldKey);
-        }}
-      >
-        {rows.map((row, index) => (
-          <DeckCard key={row.conversationId} node={row} index={index} onTurnEnd={onTurnEnd} />
-        ))}
-      </ul>
+      {/* The deck's room closes as it folds and opens as it unfolds (deck.css), so nothing around it jumps. */}
+      <div className={cn('v2-deck-body', folding && 'is-folding', opened && !folding && 'is-unfolding')}>
+        <ul
+          className={cn('v2-deck-stack', folding && 'is-folding', opened && !folding && 'is-unfolding')}
+          onAnimationEnd={(event) => {
+            if (event.target === event.currentTarget && event.animationName === 'v2-deck-fold-away') setLanded(foldKey);
+          }}
+        >
+          {rows.map((row, index) => (
+            <DeckCard key={row.conversationId} node={row} index={index} onTurnEnd={onTurnEnd} />
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
@@ -235,31 +242,16 @@ function DeckCard({ node, index, onTurnEnd }: { node: ChainNode; index: number; 
 /** A card's status, and its reply's words so far (empty unless it streams them now). */
 type StatusChildren = (status: CardStatus, writing: string) => React.ReactNode;
 
-/** A card's status: from the agent's own stream while it runs, else from its state. */
+/**
+ * A card's status: from the agent's own stream while it runs, else from its state. One component whatever the
+ * state, so the card under it stays the same element as its agent starts, waits and replies (a new element would
+ * slide out again instead of moving; frame samples, 26 November 2026).
+ */
 function StatusOf({ node, onTurnEnd, children }: { node: ChainNode; onTurnEnd: () => void; children: StatusChildren }) {
-  if (node.executionId && node.state === 'running') {
-    return (
-      <LiveStatus key={node.executionId} node={node} executionId={node.executionId} onTurnEnd={onTurnEnd}>
-        {children}
-      </LiveStatus>
-    );
-  }
-  return <>{children(cardStatus(node, null, wordsOf), '')}</>;
-}
-
-function LiveStatus({
-  node,
-  executionId,
-  onTurnEnd,
-  children,
-}: {
-  node: ChainNode;
-  executionId: string;
-  onTurnEnd: () => void;
-  children: StatusChildren;
-}) {
-  const live = useAgentStream(executionId, onTurnEnd);
-  return <>{children(cardStatus(node, { steps: live.steps, writing: live.text.length > 0 }, wordsOf), live.text)}</>;
+  const running = node.executionId && node.state === 'running' ? node.executionId : null;
+  const live = useAgentStream(running, onTurnEnd);
+  const status = cardStatus(node, running ? { steps: live.steps, writing: live.text.length > 0 } : null, wordsOf);
+  return <>{children(status, running ? live.text : '')}</>;
 }
 
 /** The card's ring as the mock draws it: gold at work, green done, plain otherwise. */

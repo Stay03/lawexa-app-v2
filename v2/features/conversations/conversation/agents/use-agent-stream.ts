@@ -154,11 +154,13 @@ function join(executionId: string, read: () => void): () => void {
  * An event relayed twice on the connection (same seq) is dropped before it is
  * applied, as the chat's own stream does (live-seq.ts).
  */
-export function useAgentStream(executionId: string, onEnd: () => void): AgentLiveTurn {
-  const subscribe = useCallback((read: () => void) => join(executionId, read), [executionId]);
+export function useAgentStream(executionId: string | null, onEnd: () => void): AgentLiveTurn {
+  // No turn running (null): nothing to watch. A card passes its own state either way, so it stays one element
+  // whether its agent works or not (a slip's tuck is a motion, not a new card).
+  const subscribe = useCallback((read: () => void) => (executionId ? join(executionId, read) : () => undefined), [executionId]);
   const live = useSyncExternalStore(
     subscribe,
-    () => turns.get(executionId)?.live ?? EMPTY,
+    () => (executionId ? (turns.get(executionId)?.live ?? EMPTY) : EMPTY),
     () => EMPTY,
   );
 
@@ -166,6 +168,7 @@ export function useAgentStream(executionId: string, onEnd: () => void): AgentLiv
   // deck pass the same one (a stable useCallback) and so share one run; the side panel's is another. Callers pass a
   // stable callback, or it re-registers each render.
   useEffect(() => {
+    if (!executionId) return;
     const turn = ensure(executionId);
     turn.onEnds.set(onEnd, (turn.onEnds.get(onEnd) ?? 0) + 1);
     return () => {

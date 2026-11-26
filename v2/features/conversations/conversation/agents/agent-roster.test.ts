@@ -280,9 +280,14 @@ test('Stop ends the agent’s turn, never just the chat’s waiting; the row str
   assert.match(roster, /\{node\.canStop && node\.executionId \? <StopAgent name=\{node\.name\} executionId=\{node\.executionId\} \/> : null\}/);
   assert.match(roster, /void chatApi\.cancelStream\(executionId, token\);/);
   assert.doesNotMatch(roster, /cancelBackgroundJob|backgroundJobsApi|\.cancel\(job/);
-  // One stream per running turn, from the reader the side panel uses; its end re-reads the list and the jobs.
-  assert.match(roster, /<LiveStatus key=\{node\.executionId\} node=\{node\} executionId=\{node\.executionId\} onTurnEnd=\{onTurnEnd\}>/);
-  assert.match(roster, /const live = useAgentStream\(executionId, onTurnEnd\);/);
+  // One stream per running turn, from the reader the side panel uses; its end re-reads the list and the jobs. One
+  // status component whatever the agent's state, so its card stays one element from slide out to tuck (frame
+  // samples, 26 November 2026: a card that swapped components mounted again and slid out a second time).
+  assert.match(roster, /const running = node\.executionId && node\.state === 'running' \? node\.executionId : null;\s*const live = useAgentStream\(running, onTurnEnd\);/);
+  assert.doesNotMatch(roster, /function LiveStatus|<LiveStatus/);
+  const stream = here('agents', 'use-agent-stream.ts');
+  assert.match(stream, /export function useAgentStream\(executionId: string \| null, onEnd: \(\) => void\): AgentLiveTurn \{/);
+  assert.match(stream, /useEffect\(\(\) => \{\s*if \(!executionId\) return;/);
   assert.match(roster, /queryKey: \[\.\.\.agentChainQueries\.all\(\), chatId\]/);
   assert.match(roster, /queryKey: \[\.\.\.agentConversationQueries\.all\(\), chatId\]/);
   assert.match(roster, /queryKey: conversationsQueries\.backgroundJobsOf\(chatId\)/);
@@ -342,6 +347,22 @@ test('the deck is the round 8 A deck Stay chose: helpers slide out under their a
   assert.match(css, /@keyframes v2-deck-fold-away/);
   assert.match(css, /@keyframes v2-deck-unfold/);
   assert.doesNotMatch(css, /cubic-bezier\([^)]*1\.[0-9]/, 'no overshoot curve (bounce)');
+  // Long enough to be seen as a move (Techlead's frame check, 26 November 2026): an in-and-out curve, the slide
+  // out and its room 0.48 s, the tuck 0.45 s, the fold 0.4 s, the unfold 0.48 s with the cards 60 ms apart.
+  assert.match(css, /--deck-ease: cubic-bezier\(0\.4, 0, 0\.2, 1\);/);
+  assert.match(css, /animation: v2-deck-slide-out 0\.48s var\(--deck-ease\) backwards;/);
+  assert.match(css, /height 0\.45s var\(--deck-ease\)/);
+  assert.match(css, /animation: v2-deck-close 0\.4s var\(--deck-ease\) 0\.6s both;/);
+  assert.match(css, /animation: v2-deck-fold-away 0\.4s var\(--deck-ease\) 0\.6s both;/);
+  // Hide only on a deck the reader opened (a deck folding by itself flashed it).
+  assert.match(deck, /\) : done && opened \? \(/);
+  // Lawexa's line closes with the fold rather than leaving at once (the deck jumped up 38px).
+  assert.match(deck, /\) : folding && !parent \? \(\s*\/\/[^\n]*\n\s*<span aria-hidden className="v2-deck-line-gone" \/>/);
+  assert.match(css, /@keyframes v2-deck-line-gone \{\s*to \{\s*height: 0;\s*margin-bottom: -12px;/);
+  assert.match(css, /animation: v2-deck-open 0\.48s var\(--deck-ease\) backwards;/);
+  assert.match(css, /animation-delay: calc\(var\(--i, 0\) \* 60ms\);/);
+  // The slip has a set height, so the tuck is a transition (auto heights do not move).
+  assert.match(css, /\.v2-deck-slip \{[^}]*height: 46px;/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   // The fold lands when its animation ends, keyed to the agents and their states; Hide folds the same way.
   assert.match(deck, /if \(event\.target === event\.currentTarget && event\.animationName === 'v2-deck-fold-away'\) setLanded\(foldKey\);/);
