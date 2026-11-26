@@ -14,8 +14,9 @@ const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts),
 
 const SCROLLERS: ReadonlyArray<[string[], string]> = [
   [
+    // Both branches: the chat page's scroller, and the admin view's `flow` box (no scroller, still positioned).
     ['v2', 'features', 'conversations', 'conversation', 'MessageList.tsx'],
-    'className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain"',
+    "className={flow ? 'relative' : 'v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain'}",
   ],
   // The folder picker's list, inside a dialog that scrolls (its drillable rows' sr-only hint).
   [

@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { ArrowLeft, Bot, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ArrowDown, ArrowLeft, Bot, Cpu, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,6 +20,7 @@ import {
 import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
+import { getInitials } from '@/lib/utils/collab';
 import { formatCost } from '@/lib/utils/currency';
 import { isNotFoundError } from '@/lib/utils/api-error';
 import type { AdminConversationView } from '@/types/admin-conversation-view';
@@ -29,13 +31,17 @@ import { AdminRawMessages } from './AdminRawMessages';
 
 /**
  * The admin conversation view (Stay, thread 085a980c, 25 November 2026): a
- * chat as its owner saw it, drawn with the owner's own components, with a
- * staff strip above it (owner, plan, agent and model, totals) and each
- * turn's tokens, cost, model and funding under its answer. Raw shows the
- * messages as the server sent them.
+ * chat as its owner saw it, drawn with the owner's own components, under a
+ * header with the staff facts (owner and plan, agent, model and cost, the
+ * agents it asked) and each turn's tokens, cost, model and funding in a quiet
+ * line under its answer. Raw shows the messages as the server sent them.
+ *
+ * ONE SCROLL, FROM THE TOP (Stay, 26 November 2026). The page scrolls as one:
+ * the transcript keeps no scroll box of its own and opens at the chat's first
+ * message. "Jump to latest" goes to its end.
  *
  * A SNAPSHOT. Read when the page opens and on Refresh; nothing streams and
- * nothing can be sent. A confidential chat shows the strip and "nothing
+ * nothing can be sent. A confidential chat shows the header and "nothing
  * kept"; a redacted chat shows the redacted text, as its owner sees it.
  */
 export function AdminConversationScreen({ id }: { id: string }) {
@@ -46,6 +52,7 @@ export function AdminConversationScreen({ id }: { id: string }) {
   const agents = useAdminConversationAgents(id, view !== null && !confidential);
   const jobs = useAdminConversationJobs(id, view !== null && !confidential);
   const [mode, setMode] = useState<'chat' | 'raw'>('chat');
+  const endRef = useRef<HTMLDivElement>(null);
 
   const { setOverride, clearOverride } = useBreadcrumbStore();
   const title = view?.title ?? null;
@@ -58,6 +65,19 @@ export function AdminConversationScreen({ id }: { id: string }) {
   const refresh = useCallback(() => {
     void queryClient.refetchQueries({ queryKey: adminKeys.conversationDetail(id) });
   }, [queryClient, id]);
+
+  const jumpToLatest = useCallback(() => {
+    const end = endRef.current;
+    if (!end) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    end.scrollIntoView({ block: 'end', behavior: smooth ? 'smooth' : 'auto' });
+    // Rows far above are sized by estimate until they draw, so a long smooth
+    // scroll can stop short of the end: once it has stopped, go the rest.
+    if (smooth) {
+      const scroller = scrollParent(end);
+      scroller?.addEventListener('scrollend', () => end.scrollIntoView({ block: 'end', behavior: 'auto' }), { once: true });
+    }
+  }, []);
 
   if (chat.isLoading) return <ScreenSkeleton />;
 
@@ -84,10 +104,11 @@ export function AdminConversationScreen({ id }: { id: string }) {
     );
   }
 
+  const hasMessages = view.messages.length > 0;
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <BackLink />
-      <ConversationStrip
+      <ChatHeader
         view={view}
         readAt={chat.dataUpdatedAt}
         refreshing={refreshing}
@@ -104,14 +125,22 @@ export function AdminConversationScreen({ id }: { id: string }) {
           </p>
         </div>
       ) : (
-        <>
-          <Tabs value={mode} onValueChange={(value) => setMode(value === 'raw' ? 'raw' : 'chat')}>
-            <TabsList>
-              <TabsTrigger value="chat">As the owner sees it</TabsTrigger>
-              <TabsTrigger value="raw">Raw</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {view.messages.length === 0 ? (
+        <section aria-label="The chat" className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Tabs value={mode} onValueChange={(value) => setMode(value === 'raw' ? 'raw' : 'chat')}>
+              <TabsList>
+                <TabsTrigger value="chat">As the owner sees it</TabsTrigger>
+                <TabsTrigger value="raw">Raw</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {hasMessages && (
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={jumpToLatest}>
+                <ArrowDown aria-hidden />
+                Jump to latest
+              </Button>
+            )}
+          </div>
+          {!hasMessages ? (
             <div className="rounded-lg border px-6 py-10 text-center text-sm text-muted-foreground">
               No messages in this chat.
             </div>
@@ -120,10 +149,20 @@ export function AdminConversationScreen({ id }: { id: string }) {
           ) : (
             <OwnerTranscript view={view} agents={agents.data ?? []} jobs={jobs.data ?? []} />
           )}
-        </>
+          <div ref={endRef} aria-hidden />
+        </section>
       )}
     </div>
   );
+}
+
+/** The nearest box that scrolls (the admin shell's content region). */
+function scrollParent(node: HTMLElement): HTMLElement | null {
+  for (let el = node.parentElement; el; el = el.parentElement) {
+    const overflow = getComputedStyle(el).overflowY;
+    if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+  }
+  return null;
 }
 
 function OwnerTranscript({
@@ -145,26 +184,21 @@ function OwnerTranscript({
     },
     [facts, showNGN, exchangeRate],
   );
-  return (
-    // The transcript scrolls in its own frame, as it does on the chat page.
-    <div className="h-[calc(100dvh-12rem)] min-h-[28rem] overflow-hidden rounded-lg border">
-      <AdminTranscript view={view} agentConversations={agents} jobs={jobs} turnFooter={turnFooter} />
-    </div>
-  );
+  return <AdminTranscript view={view} agentConversations={agents} jobs={jobs} turnFooter={turnFooter} />;
 }
 
-/** Staff only, under an answer: what its turn cost, which model wrote it, what paid. */
+/** Staff only, under an answer: what its turn cost, which model wrote it, what paid. Quiet, so the answer leads. */
 function TurnLine({ facts, cost }: { facts: TurnFacts; cost: string }) {
   return (
     <p
       data-admin-turn-line=""
-      className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 rounded-md bg-muted/60 px-2.5 py-1.5 text-[11px] tabular-nums text-muted-foreground"
+      className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] leading-4 tabular-nums text-muted-foreground/80"
     >
-      <span>{tokensLine(facts)}</span>
-      <span className="font-medium text-foreground/80">
+      <span className="text-muted-foreground">
         {cost}
         {facts.estimated ? ' estimated' : ''}
       </span>
+      <span>{tokensLine(facts)}</span>
       {facts.models.length > 0 && <span>{facts.models.join(', ')}</span>}
       <span>{callsLine(facts)}</span>
       {facts.funding && <span>{fundingLine(facts.funding)}</span>}
@@ -172,7 +206,7 @@ function TurnLine({ facts, cost }: { facts: TurnFacts; cost: string }) {
   );
 }
 
-function ConversationStrip({
+function ChatHeader({
   view,
   readAt,
   refreshing,
@@ -190,27 +224,11 @@ function ConversationStrip({
   const owner = view.owner;
   const usage = view.usage;
   return (
-    <section aria-label="About this chat" className="rounded-lg border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-lg font-semibold tracking-tight text-balance">{view.title || 'Untitled chat'}</h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {view.is_confidential && <Badge variant="secondary">Confidential</Badge>}
-            {view.is_redacted && <Badge variant="secondary">Redacted</Badge>}
-            <Badge variant="outline">{view.is_private ? 'Private' : 'Public'}</Badge>
-            {view.status === 'archived' && <Badge variant="outline">Archived</Badge>}
-            {view.parent_conversation && (
-              <Link
-                href={`/admin/conversations/${view.parent_conversation.id}`}
-                className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              >
-                Asked by {view.parent_conversation.title || 'a chat'}
-              </Link>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Read at {format(new Date(readAt), 'HH:mm:ss')}</span>
+    <header aria-label="About this chat" className="flex flex-col gap-3 border-b pb-5">
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="min-w-0 text-xl font-semibold tracking-tight text-balance">{view.title || 'Untitled chat'}</h1>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="hidden text-xs text-muted-foreground sm:inline">Read at {format(new Date(readAt), 'HH:mm:ss')}</span>
           <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
             {refreshing ? <Loader2 aria-hidden className="animate-spin" /> : <RefreshCw aria-hidden />}
             Refresh
@@ -218,73 +236,102 @@ function ConversationStrip({
         </div>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
-        <Fact label="Owner">
-          {owner ? (
-            <>
-              <Link href={`/admin/users/${owner.uuid}`} className="font-medium underline-offset-2 hover:underline">
-                {owner.name}
-              </Link>
-              <span className="block truncate text-xs text-muted-foreground">{owner.email}</span>
-              {owner.deleted_at && <span className="block text-xs text-destructive">Account deleted</span>}
-            </>
-          ) : (
-            <span className="text-muted-foreground">Unknown</span>
-          )}
-        </Fact>
-        <Fact label="Plan">{owner ? planLine(owner) : 'Unknown'}</Fact>
-        <Fact label="Agent and model">
-          <span className="font-medium">{view.agent?.name ?? 'None'}</span>
-          {view.agent?.model && <span className="block text-xs text-muted-foreground">{view.agent.model.name}</span>}
-        </Fact>
-        <Fact label="Tokens">
-          <span className="tabular-nums">{(usage?.total_tokens ?? 0).toLocaleString()}</span>
-          <span className="block text-xs tabular-nums text-muted-foreground">
-            {tokensLine({ promptTokens: usage?.prompt_tokens ?? 0, completionTokens: usage?.completion_tokens ?? 0 })}
-          </span>
-        </Fact>
-        <Fact label="Cost">
-          <span className="tabular-nums">{formatCost(usage?.total_cost ?? 0, { showNGN, exchangeRate, decimals: 4 })}</span>
-        </Fact>
-        <Fact label="Messages">
-          <span className="tabular-nums">{view.messages_count}</span>
-          <span className="block text-xs text-muted-foreground">
-            {view.views_count ?? 0} {view.views_count === 1 ? 'view' : 'views'}, started {format(new Date(view.created_at), 'd MMM yyyy')}
-          </span>
-        </Fact>
-      </dl>
+      {/* Who owns it: face, name, plan and email on one line. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm">
+        {owner ? (
+          <>
+            <Link
+              href={`/admin/users/${owner.uuid}`}
+              className="inline-flex min-w-0 items-center gap-2 font-medium underline-offset-2 hover:underline"
+            >
+              <Avatar className="size-6">
+                <AvatarFallback className="text-[10px] font-medium">{getInitials(owner.name)}</AvatarFallback>
+              </Avatar>
+              <span className="truncate">{owner.name}</span>
+            </Link>
+            <Badge variant="secondary" className="font-normal">
+              {planLine(owner)}
+            </Badge>
+            <span className="min-w-0 truncate text-muted-foreground">{owner.email}</span>
+            {owner.deleted_at && <span className="text-xs text-destructive">Account deleted</span>}
+          </>
+        ) : (
+          <span className="text-muted-foreground">Owner unknown</span>
+        )}
+      </div>
+
+      {/* What answered and what it cost, then the chat's own marks. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Chip icon={<Bot aria-hidden className="size-3.5" />}>{view.agent?.name ?? 'No agent'}</Chip>
+        {view.agent?.model && <Chip icon={<Cpu aria-hidden className="size-3.5" />}>{view.agent.model.name}</Chip>}
+        <Chip>
+          <span className="font-medium tabular-nums">{formatCost(usage?.total_cost ?? 0, { showNGN, exchangeRate, decimals: 4 })}</span>
+        </Chip>
+        {view.is_confidential && <Badge variant="secondary">Confidential</Badge>}
+        {view.is_redacted && <Badge variant="secondary">Redacted</Badge>}
+        <Badge variant="outline" className="font-normal">
+          {view.is_private ? 'Private' : 'Public'}
+        </Badge>
+        {view.status === 'archived' && (
+          <Badge variant="outline" className="font-normal">
+            Archived
+          </Badge>
+        )}
+        {view.parent_conversation && (
+          <Link
+            href={`/admin/conversations/${view.parent_conversation.id}`}
+            className="ml-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            Asked by {view.parent_conversation.title || 'a chat'}
+          </Link>
+        )}
+      </div>
+
+      {/* The counts, second to the rest. */}
+      <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums text-muted-foreground">
+        <span>
+          {(usage?.total_tokens ?? 0).toLocaleString()} tokens (
+          {tokensLine({ promptTokens: usage?.prompt_tokens ?? 0, completionTokens: usage?.completion_tokens ?? 0 })})
+        </span>
+        <span>
+          {view.messages_count} {view.messages_count === 1 ? 'message' : 'messages'}
+        </span>
+        <span>
+          {view.views_count ?? 0} {view.views_count === 1 ? 'view' : 'views'}
+        </span>
+        <span>Started {format(new Date(view.created_at), 'd MMM yyyy, HH:mm')}</span>
+      </p>
 
       {agents.length > 0 && (
-        <div className="mt-4 border-t pt-3">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Agents this chat asked</p>
-          <ul className="flex flex-wrap gap-2">
-            {agents.map((agent) => (
-              <li key={agent.id}>
-                <Link
-                  href={`/admin/conversations/${agent.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs hover:bg-muted"
-                >
-                  <Bot aria-hidden className="size-3.5" />
-                  {agent.agent.name}
-                  <span className="text-muted-foreground">
-                    {agent.messages_count} {agent.messages_count === 1 ? 'message' : 'messages'}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ul aria-label="Agents this chat asked" className="flex flex-wrap gap-1.5">
+          {agents.map((agent) => (
+            <li key={agent.id}>
+              <Link
+                href={`/admin/conversations/${agent.id}`}
+                title={`${agent.messages_count} ${agent.messages_count === 1 ? 'message' : 'messages'}. Open its conversation`}
+                className="inline-flex items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-0.5 text-xs transition-colors hover:bg-muted"
+              >
+                <Avatar className="size-5">
+                  <AvatarFallback className="bg-primary/10 text-[9px] font-semibold text-primary">
+                    {getInitials(agent.agent.name)}
+                  </AvatarFallback>
+                </Avatar>
+                {agent.agent.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
-    </section>
+    </header>
   );
 }
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+function Chip({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5">{children}</dd>
-    </div>
+    <span className="inline-flex h-6 items-center gap-1.5 rounded-md border bg-muted/40 px-2 text-xs">
+      {icon && <span className="text-muted-foreground">{icon}</span>}
+      {children}
+    </span>
   );
 }
 
@@ -301,11 +348,15 @@ function BackLink() {
 
 function ScreenSkeleton() {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <Skeleton className="h-8 w-32" />
-      <Skeleton className="h-40 rounded-lg" />
+      <div className="flex flex-col gap-3 border-b pb-5">
+        <Skeleton className="h-7 w-2/3" />
+        <Skeleton className="h-6 w-1/2" />
+        <Skeleton className="h-6 w-80 max-w-full" />
+      </div>
       <Skeleton className="h-9 w-56" />
-      <Skeleton className="h-[60vh] rounded-lg" />
+      <Skeleton className="h-[50vh] rounded-lg" />
     </div>
   );
 }

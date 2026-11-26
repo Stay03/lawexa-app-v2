@@ -20,6 +20,22 @@ test('the admin transcript is read-only, follows no live turn, and keeps nothing
   assert.doesNotMatch(transcript, /persister:|deviceCachePersister|V2QueryProvider/);
 });
 
+test('the admin transcript is read in the page from its top: no scroller, no landing, no pill (Stay, 26 November 2026)', () => {
+  const transcript = read('conversations', 'admin-view', 'AdminTranscript.tsx');
+  assert.match(transcript, /onReply=\{null\}\s*flow\s*\/>/);
+  assert.doesNotMatch(transcript, /h-full|flex-1/);
+  const list = read('conversations', 'conversation', 'MessageList.tsx');
+  // Drawn whole in its first frame, never pinned to the bottom of a tail.
+  assert.match(list, /const \[showAll, setShowAll\] = useState\(flow\);/);
+  assert.match(list, /const anchorBottom = !flow && openTail\.older\.length > 0;/);
+  // Each answer parses whole; the opening scroll to the bottom never runs; no pill.
+  assert.match(list, /opened: opened \|\| flow,/);
+  assert.match(list, /if \(flow \|\| didInitialScrollRef\.current \|\| messages\.length === 0\) return;/);
+  assert.match(list, /\{!flow && \(\s*<div\s*aria-hidden=\{!showPill\}/);
+  // The chat page keeps all of it: it never passes `flow`.
+  assert.doesNotMatch(read('conversations', 'conversation', 'ConversationScreen.tsx'), /^\s+flow(=\{[^}]*\})?\s*\/?>?\s*$/m);
+});
+
 test('every row that can act reads the read-only signal', () => {
   const uses = /const readOnly = useReadOnlyTranscript\(\);/;
   const actors: string[][] = [

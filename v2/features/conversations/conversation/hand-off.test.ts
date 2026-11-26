@@ -21,7 +21,8 @@ test('a cached open does not fade the transcript in from blank', () => {
 });
 
 test('a chat with messages left to fill in above the first frame is anchored to the bottom', () => {
-  assert.match(list, /const anchorBottom = openTail\.older\.length > 0;/);
+  // Not in `flow` (the admin view, read from its top), which draws whole in its first frame.
+  assert.match(list, /const anchorBottom = !flow && openTail\.older\.length > 0;/);
   assert.match(list, /anchorBottom && 'min-h-full justify-end'/);
 });
 

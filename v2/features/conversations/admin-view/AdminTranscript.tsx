@@ -30,6 +30,9 @@ import '@/v2/shell/shell.css';
  * staff reading another person's chat must not leave it in the browser's
  * cache.
  *
+ * ONE SCROLL. The transcript has no scroller of its own: it grows in the
+ * admin page, which opens at the chat's first message (MessageList `flow`).
+ *
  * READ ONLY. A snapshot: nothing streams, and the page reads it again only on
  * Refresh. No chat context is provided, so nothing in a row can send, answer
  * a card, keep a file as a template or regenerate; `ReadOnlyTranscript` turns
@@ -105,7 +108,8 @@ export function AdminTranscript({
           <BackgroundJobsProvider conversationId={view.id} jobs={jobs} readOnly>
             <AgentRowsProvider conversationId={view.id} agentConversations={readerAgents}>
               <TurnFooterProvider render={turnFooter}>
-                <div data-admin-transcript="" className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                {/* Read in the admin page's own scroll, from the top (Stay, 26 November 2026). */}
+                <div data-admin-transcript="" className="relative flex min-w-0 flex-col">
                   <MessageList
                     messages={messages}
                     streamingText={STILL}
@@ -125,6 +129,7 @@ export function AdminTranscript({
                     masthead={null}
                     underBar={false}
                     onReply={null}
+                    flow
                   />
                 </div>
               </TurnFooterProvider>
