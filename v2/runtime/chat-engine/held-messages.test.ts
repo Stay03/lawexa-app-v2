@@ -107,6 +107,6 @@ test('a held send marks its row before the turn ends with no reply coming, so no
   const controller = readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'useConversationController.ts'), 'utf8');
   assert.match(
     controller,
-    /onHeldMessagesAnswered\(\(event\) => \{\s*if \(event\.conversation_id !== conversationId\) return;\s*releaseHeld\(event\.message_ids\);\s*if \(!streamingNowRef\.current\) followResumedTurn\(event\.execution_id\);/,
+    /onHeldMessagesAnswered\(\(event\) => \{\s*if \(event\.conversation_id !== conversationId\) return;\s*releaseHeld\(event\.message_ids\);\s*if \(followedAnswerRef\.current === event\.execution_id\) return;\s*followedAnswerRef\.current = event\.execution_id;\s*if \(!streamingNowRef\.current\) followResumedTurn\(event\.execution_id\);/,
   );
 });
