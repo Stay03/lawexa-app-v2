@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, CircleAlert, Loader2, Square } from 'lucide-react';
+import { CircleAlert, Loader2, Square } from 'lucide-react';
 import { ThinkingOrb } from 'thinking-orbs';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -21,6 +21,7 @@ import { useAgentRowsOf, useChainHeld, type ChainParent } from './context';
 import { agentChainQueries, agentConversationQueries } from './queries';
 import { useAgentStream } from './use-agent-stream';
 import { useStopChain } from './use-stop-chain';
+import './deck.css';
 
 /**
  * AgentRoster — the agent deck (Stay, 25 November 2026, 22:48Z, thread
@@ -71,24 +72,32 @@ export function AgentRoster({ messageId, parent }: { messageId: number | null; p
     void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(chatId) });
   }, [queryClient, chatId]);
 
-  if (!held || !chatId) return null;
-  const rows = held.rows;
+  const rows = held?.rows ?? NO_ROWS;
   const askedBy = parent?.name ?? 'Lawexa';
-  const done = rows.every(settled);
+  const done = rows.length > 0 && rows.every(settled);
   // Lawexa's line, with the chain's Stop and queued count, sits on the chat's newest deck for as long as the chain
   // is open, even once the agents it asked have finished (a helper further down may still work), and on no other
   // deck (review of 60ef98b8). A deck with that line never folds.
   const lineShown = !parent && chainOpen && messageId !== null && messageId === newestCaller;
+  const wantFolded = done && !lineShown && !opened;
+  // Which agents, in which states, the fold has landed for: a deck already done when drawn starts folded; one that
+  // finishes on screen plays the fold first (deck.css), and a new set of agents folds again when it finishes.
+  const foldKey = rows.map((row) => `${row.conversationId}:${row.state}`).join('|');
+  const [landed, setLanded] = useState<string | null>(() => (wantFolded ? foldKey : null));
   const toggle = (next: boolean) => {
     focusNext.current = true;
+    // Hide plays the same fold as finishing does.
+    if (!next) setLanded(null);
     setOpened(next);
   };
 
-  if (done && !lineShown && !opened) {
+  if (!held || !chatId) return null;
+  if (wantFolded && landed === foldKey) {
     return <FoldedDeck ref={showRef} rows={rows} askedBy={askedBy} onShow={() => toggle(true)} />;
   }
+  const folding = wantFolded;
   return (
-    <section aria-label={`Agents ${askedBy} asked`} className="flex flex-col gap-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+    <section aria-label={`Agents ${askedBy} asked`} className="v2-deck flex flex-col gap-3">
       {lineShown ? (
         <LawexaLine rows={rows} conversationId={chatId} />
       ) : done ? (
@@ -101,14 +110,21 @@ export function AgentRoster({ messageId, parent }: { messageId: number | null; p
           Hide the agents
         </button>
       ) : null}
-      <ul className="flex flex-col gap-2">
-        {rows.map((row) => (
-          <DeckCard key={row.conversationId} node={row} onTurnEnd={onTurnEnd} />
+      <ul
+        className={cn('v2-deck-stack', folding && 'is-folding', opened && !folding && 'is-unfolding')}
+        onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget && event.animationName === 'v2-deck-fold-away') setLanded(foldKey);
+        }}
+      >
+        {rows.map((row, index) => (
+          <DeckCard key={row.conversationId} node={row} index={index} onTurnEnd={onTurnEnd} />
         ))}
       </ul>
     </section>
   );
 }
+
+const NO_ROWS: readonly ChainNode[] = [];
 
 /** Lookups in the card's words, from the transcript's own wording. */
 const wordsOf: StepWords = (step) => formatToolMessage(step.name, step.parameters, step.done);
@@ -162,16 +178,7 @@ function LawexaLine({ rows, conversationId }: { rows: readonly ChainNode[]; conv
   );
 }
 
-/*
- * THE LOOK (Stay, 26 November 2026: "too vibe coded"): the chat's own plain
- * surfaces. A card is the draft card's (`rounded-2xl border bg-card`), a face
- * is the step marker's neutral disc, names and lines use the tool rows' type,
- * and a helper is a row in its asker's card under a left rule, as a lookup sits
- * under its step. Colour is kept for state only, in one small mark: working,
- * done, failed (StateMark).
- */
-
-/** All finished: one plain line with every face, the count, and Show. */
+/** All finished: one green line with every face, the count, and Show (the mock's folded line). */
 function FoldedDeck({
   rows,
   askedBy,
@@ -185,50 +192,51 @@ function FoldedDeck({
 }) {
   const allReplied = rows.every((row) => row.state === 'replied');
   return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={onShow}
-      aria-label={`${foldLine(rows)}. Show the agents ${askedBy} asked`}
-      className={cn(
-        'v2-interactive inline-flex w-fit max-w-full items-center gap-2 rounded-full border border-border bg-card py-1 pr-3 pl-1 text-[13px] transition-colors hover:bg-secondary/50 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-        FOCUS_RING,
-      )}
-    >
-      <span aria-hidden className="flex">
-        {rows.map((row, index) => (
-          <span key={row.conversationId} style={{ zIndex: rows.length - index }} className={cn(index > 0 && '-ml-1.5')}>
-            <Face initials={agentInitials(row.name)} size="s" ring />
-          </span>
-        ))}
-      </span>
-      {allReplied ? <StateMark tone="done" /> : null}
-      <span className="truncate font-medium text-foreground">{foldLine(rows)}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">Show</span>
-    </button>
+    <div className="v2-deck">
+      <button
+        ref={ref}
+        type="button"
+        onClick={onShow}
+        aria-label={`${foldLine(rows)}. Show the agents ${askedBy} asked`}
+        className={cn('v2-interactive v2-deck-fold is-arriving', !allReplied && 'is-mixed', FOCUS_RING)}
+      >
+        <span aria-hidden className="v2-deck-faces">
+          {rows.map((row, index) => (
+            <span key={row.conversationId} style={{ zIndex: rows.length - index }} className="flex">
+              <Face initials={agentInitials(row.name)} tone={row.state === 'replied' ? 'done' : 'quiet'} size="s" />
+            </span>
+          ))}
+        </span>
+        <span className="truncate font-semibold">{foldLine(rows)}</span>
+        <span className="v2-deck-fold-more">Show</span>
+      </button>
+    </div>
   );
 }
 
 /**
- * One agent's card: its own row, and its helpers' rows under it. The line
- * comes from the agent's stream while it runs; a tap, or the pointer resting on
- * a row, opens that agent's popover.
+ * One agent's card, with its helpers' cards slid out under it. The line comes
+ * from the agent's stream while it runs; a tap, or the pointer resting on the
+ * card, opens its popover.
  */
-function DeckCard({ node, onTurnEnd }: { node: ChainNode; onTurnEnd: () => void }) {
+function DeckCard({ node, index, onTurnEnd }: { node: ChainNode; index: number; onTurnEnd: () => void }) {
   return (
-    <li className="flex flex-col rounded-2xl border border-border bg-card motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+    <li className="flex flex-col" style={{ ['--i' as string]: index }}>
       <AgentPopover node={node} onTurnEnd={onTurnEnd}>
         <StatusOf node={node} onTurnEnd={onTurnEnd}>
           {(status) => <CardFace node={node} status={status} />}
         </StatusOf>
       </AgentPopover>
-      {node.children.length > 0 ? <Helpers nodes={node.children} onTurnEnd={onTurnEnd} /> : null}
+      {node.children.length > 0 ? <Helpers nodes={node.children} level={1} parentDone={settled(node)} onTurnEnd={onTurnEnd} /> : null}
     </li>
   );
 }
 
+/** A card's status, and its reply's words so far (empty unless it streams them now). */
+type StatusChildren = (status: CardStatus, writing: string) => React.ReactNode;
+
 /** A card's status: from the agent's own stream while it runs, else from its state. */
-function StatusOf({ node, onTurnEnd, children }: { node: ChainNode; onTurnEnd: () => void; children: (status: CardStatus) => React.ReactNode }) {
+function StatusOf({ node, onTurnEnd, children }: { node: ChainNode; onTurnEnd: () => void; children: StatusChildren }) {
   if (node.executionId && node.state === 'running') {
     return (
       <LiveStatus key={node.executionId} node={node} executionId={node.executionId} onTurnEnd={onTurnEnd}>
@@ -236,7 +244,7 @@ function StatusOf({ node, onTurnEnd, children }: { node: ChainNode; onTurnEnd: (
       </LiveStatus>
     );
   }
-  return <>{children(cardStatus(node, null, wordsOf))}</>;
+  return <>{children(cardStatus(node, null, wordsOf), '')}</>;
 }
 
 function LiveStatus({
@@ -248,48 +256,50 @@ function LiveStatus({
   node: ChainNode;
   executionId: string;
   onTurnEnd: () => void;
-  children: (status: CardStatus) => React.ReactNode;
+  children: StatusChildren;
 }) {
   const live = useAgentStream(executionId, onTurnEnd);
-  return <>{children(cardStatus(node, { steps: live.steps, writing: live.text.length > 0 }, wordsOf))}</>;
+  return <>{children(cardStatus(node, { steps: live.steps, writing: live.text.length > 0 }, wordsOf), live.text)}</>;
 }
 
-/** The line's words: muted, as the tool rows' detail; a failure in the destructive colour, as a failed step. */
-const TONE_TEXT: Record<CardTone, string> = {
-  working: 'text-muted-foreground',
-  waiting: 'text-muted-foreground',
-  done: 'text-muted-foreground',
-  quiet: 'text-muted-foreground',
-  failed: 'text-destructive',
+/** The card's ring as the mock draws it: gold at work, green done, plain otherwise. */
+const CARD_TONE: Record<CardTone, string> = {
+  working: 'is-working',
+  waiting: '',
+  done: 'is-done',
+  quiet: '',
+  failed: '',
 };
 
 function CardFace({ node, status }: { node: ChainNode; status: CardStatus }) {
   // Spans, not divs: the face sits inside the card's button.
   return (
-    <span className="flex min-w-0 items-center gap-3 px-3.5 py-3 text-left">
-      <Face initials={agentInitials(node.name)} />
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-sm font-medium text-foreground">{node.name}</span>
+    <span className={cn('v2-deck-card', CARD_TONE[status.tone])}>
+      <Face initials={agentInitials(node.name)} tone={status.tone} />
+      <span className="v2-deck-meta">
+        <span className="v2-deck-name">{node.name}</span>
         <StatusText status={status} />
       </span>
     </span>
   );
 }
 
-/** The one state mark, the only colour in the deck: working, done, failed. Waiting and the rest carry none. */
-function StateMark({ tone }: { tone: CardTone }) {
-  if (tone === 'working') return <Loader2 aria-hidden className="size-3 shrink-0 text-primary motion-safe:animate-spin" />;
-  if (tone === 'done') return <Check aria-hidden strokeWidth={2.5} className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" />;
-  if (tone === 'failed') return <CircleAlert aria-hidden className="size-3 shrink-0 text-destructive" />;
-  return null;
-}
+/** The step's colour: gold at work, green done, muted waiting, red failed. */
+const STEP_TONE: Record<CardTone, string> = {
+  working: '',
+  waiting: 'is-muted',
+  done: 'is-done',
+  quiet: 'is-muted',
+  failed: 'is-failed',
+};
 
 /** The one line; a new line fades in over the old, so a change reads as a change. */
-function StatusText({ status, small = false }: { status: CardStatus; small?: boolean }) {
+function StatusText({ status }: { status: CardStatus }) {
   return (
-    <span className={cn('flex min-w-0 items-center gap-1.5', small ? 'text-xs' : 'text-[13px]', TONE_TEXT[status.tone])}>
-      <StateMark tone={status.tone} />
-      <span key={status.words} className="truncate motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+    <span className={cn('v2-deck-step', STEP_TONE[status.tone])}>
+      {status.tone === 'working' ? <span aria-hidden className="v2-deck-spin" /> : null}
+      {status.tone === 'failed' ? <CircleAlert aria-hidden className="size-3 shrink-0" /> : null}
+      <span key={status.words} className="v2-deck-fade">
         {status.words}
       </span>
     </span>
@@ -297,48 +307,91 @@ function StatusText({ status, small = false }: { status: CardStatus; small?: boo
 }
 
 /**
- * The helpers an agent asked, as rows in its card under a left rule (the way a
- * lookup sits under its step), a helper's helper one rule further in. Each row
- * has its own line and opens its own popover.
+ * The helpers' cards under their asker's, each a step narrower: out with its
+ * own line while it works or waits, tucked back to a thin edge with its name
+ * once it, or its asker, is done.
  */
-function Helpers({ nodes, onTurnEnd }: { nodes: readonly ChainNode[]; onTurnEnd: () => void }) {
+function Helpers({ nodes, level, parentDone, onTurnEnd }: { nodes: readonly ChainNode[]; level: number; parentDone: boolean; onTurnEnd: () => void }) {
   return (
-    <ul aria-label="Helpers" className="mb-2.5 ml-[29px] mr-3 flex flex-col gap-0.5 border-l border-border pl-3">
+    <>
       {nodes.map((node) => (
-        <li key={node.conversationId} className="flex flex-col">
+        <div key={node.conversationId} className="flex flex-col">
           <AgentPopover node={node} onTurnEnd={onTurnEnd}>
             <StatusOf node={node} onTurnEnd={onTurnEnd}>
-              {(status) => <HelperRow node={node} status={status} />}
+              {(status) => <HelperSlip node={node} status={status} level={level} tucked={parentDone || settled(node)} />}
             </StatusOf>
           </AgentPopover>
-          {node.children.length > 0 ? <Helpers nodes={node.children} onTurnEnd={onTurnEnd} /> : null}
-        </li>
+          {node.children.length > 0 ? (
+            <Helpers nodes={node.children} level={level + 1} parentDone={parentDone || settled(node)} onTurnEnd={onTurnEnd} />
+          ) : null}
+        </div>
       ))}
-    </ul>
+    </>
   );
 }
 
-function HelperRow({ node, status }: { node: ChainNode; status: CardStatus }) {
+/** A helper's card: one element from the slide out to the tuck, so the change is a motion, not a swap. */
+function HelperSlip({ node, status, level, tucked }: { node: ChainNode; status: CardStatus; level: number; tucked: boolean }) {
+  const failed = status.tone === 'failed';
   return (
-    <span className="flex min-w-0 items-center gap-2 px-1.5 py-1.5">
-      <Face initials={agentInitials(node.name)} size="xs" />
-      <span className="shrink-0 text-[13px] font-medium text-foreground">{node.name}</span>
-      <StatusText status={status} small />
+    <span
+      className={cn(
+        'v2-deck-slip is-arriving',
+        level === 2 && 'is-l2',
+        level >= 3 && 'is-l3',
+        tucked ? 'is-tucked' : status.tone !== 'working' && 'is-waiting',
+        failed && 'is-failed',
+      )}
+    >
+      {tucked ? (
+        <span key="peek" className="v2-deck-peek v2-deck-fade">
+          <Face initials={agentInitials(node.name)} tone={failed ? 'failed' : 'done'} size="xs" />
+          {node.name}
+          {/* A tucked helper that could not reply says so, not only in colour. */}
+          {failed ? <span className="font-normal">· {status.words}</span> : null}
+        </span>
+      ) : (
+        <>
+          <Face initials={agentInitials(node.name)} tone={status.tone} size="s" />
+          <span className="flex min-w-0 items-baseline gap-1.5">
+            <span className="v2-deck-name shrink-0">{node.name}</span>
+            {/* A helper waiting on its own helper says so in the mock's words; the helper's slip is right under it. */}
+            <StatusText status={waitingOnHelper(status)} />
+          </span>
+        </>
+      )}
     </span>
   );
 }
 
-/** An agent's initials on the step marker's neutral disc; its state is the line's mark, never the face's colour. */
-function Face({ initials, size = 'm', ring = false }: { initials: string; size?: 'm' | 's' | 'xs'; ring?: boolean }) {
+/** An agent waiting on its own helper, in the mock's words (a slip and the popover; the card names the helper). */
+function waitingOnHelper(status: CardStatus): CardStatus {
+  return status.tone === 'waiting' ? { ...status, words: 'waiting on its helper' } : status;
+}
+
+/** The end of an agent's reply so far, from a word's start: the popover's live line. */
+function writingTail(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= LIVE_TAIL) return flat;
+  const cut = flat.slice(-LIVE_TAIL);
+  const space = cut.indexOf(' ');
+  return `…${space >= 0 ? cut.slice(space + 1) : cut}`;
+}
+
+const LIVE_TAIL = 120;
+
+/** The face as the mock draws it: gold at work, grey waiting or still, green done. */
+const FACE_TONE: Record<CardTone, string> = {
+  working: '',
+  waiting: 'is-idle',
+  done: 'is-done',
+  quiet: 'is-idle',
+  failed: 'is-failed',
+};
+
+function Face({ initials, tone, size = 'm' }: { initials: string; tone: CardTone; size?: 'm' | 's' | 'xs' }) {
   return (
-    <span
-      aria-hidden
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-secondary font-semibold text-muted-foreground',
-        size === 'm' ? 'size-8 text-[11px]' : size === 's' ? 'size-5 text-[7.5px]' : 'size-5 text-[7.5px]',
-        ring && 'ring-2 ring-card',
-      )}
-    >
+    <span aria-hidden className={cn('v2-deck-face', FACE_TONE[tone], size === 's' && 'is-s', size === 'xs' && 'is-xs')}>
       {initials}
     </span>
   );
@@ -398,7 +451,7 @@ function AgentPopover({ node, onTurnEnd, children }: { node: ChainNode; onTurnEn
           }}
           onPointerMove={moved}
           onPointerLeave={(event) => hover(event, false)}
-          className={cn('v2-interactive block w-full min-w-0 rounded-xl text-left transition-colors hover:bg-secondary/50', FOCUS_RING)}
+          className={cn('v2-interactive block w-full min-w-0 rounded-2xl text-left', FOCUS_RING)}
         >
           {children}
         </button>
@@ -412,9 +465,10 @@ function AgentPopover({ node, onTurnEnd, children }: { node: ChainNode; onTurnEn
           if (!byKeyboard.current) event.preventDefault();
           byKeyboard.current = false;
         }}
-        className="w-80 max-w-[calc(100vw-2rem)] p-3"
+        // The mock's popover: 330px on a computer, the card's width on a phone, a hairline ring and a long soft shadow.
+        className="v2-deck w-[330px] max-w-[calc(100vw-2rem)] items-start gap-[9px] rounded-[14px] bg-(--deck-card) px-3.5 py-3 text-[12.5px] leading-normal text-(--deck-fg) shadow-[0_0_0_1px_var(--deck-line),0_18px_40px_-18px_var(--deck-shadow)] ring-0 max-sm:w-(--radix-popover-trigger-width)"
       >
-        <ul className="flex flex-col gap-2">
+        <ul className="flex w-full min-w-0 flex-col gap-[9px]">
           <PopoverRow node={node} level={0} onTurnEnd={onTurnEnd} />
         </ul>
         {panel ? (
@@ -424,7 +478,7 @@ function AgentPopover({ node, onTurnEnd, children }: { node: ChainNode; onTurnEn
               setOpen(false);
               panel.open({ kind: 'agent', id: node.conversationId });
             }}
-            className={cn('v2-interactive mt-3 rounded-sm text-xs font-semibold text-primary hover:underline', FOCUS_RING)}
+            className={cn('v2-interactive rounded-sm text-[12.5px] leading-none font-semibold text-(--deck-gold) hover:underline', FOCUS_RING)}
           >
             Open its conversation
           </button>
@@ -437,19 +491,28 @@ function AgentPopover({ node, onTurnEnd, children }: { node: ChainNode; onTurnEn
 function PopoverRow({ node, level, onTurnEnd }: { node: ChainNode; level: number; onTurnEnd: () => void }) {
   return (
     <>
-      <li style={{ paddingLeft: `${level * 14}px` }} className="flex min-w-0 flex-col gap-0.5">
+      <li style={{ paddingLeft: `${level * 14}px` }} className="flex min-w-0 flex-col gap-[9px]">
         <StatusOf node={node} onTurnEnd={onTurnEnd}>
-          {(status) => (
-            <span className="flex min-w-0 items-center gap-2">
-              <Face initials={agentInitials(node.name)} size="s" />
-              <span className="shrink-0 text-[13px] font-semibold text-foreground">{node.name}</span>
-              <StatusText status={status} small />
-              {node.canStop && node.executionId ? <StopAgent name={node.name} executionId={node.executionId} /> : null}
-            </span>
+          {(status, writing) => (
+            <>
+              <span className="flex min-w-0 items-center gap-2">
+                <Face initials={agentInitials(node.name)} tone={status.tone} size="s" />
+                <span className={cn('v2-deck-name shrink-0', level > 0 && 'is-s')}>{node.name}</span>
+                <StatusText status={waitingOnHelper(status)} />
+                {node.canStop && node.executionId ? <StopAgent name={node.name} executionId={node.executionId} /> : null}
+              </span>
+              {/* Its reply's words as they come (the mock's live line, with its caret). */}
+              {writing ? (
+                <p className="v2-deck-live">
+                  {writingTail(writing)}
+                  <span aria-hidden className="v2-deck-caret" />
+                </p>
+              ) : null}
+            </>
           )}
         </StatusOf>
         {node.state === 'replied' && node.replyStart ? (
-          <p className="line-clamp-2 pl-7 text-xs leading-relaxed text-muted-foreground">{node.replyStart}</p>
+          <p className="v2-deck-live is-reply line-clamp-2">{node.replyStart}</p>
         ) : null}
       </li>
       {node.children.map((child) => (
@@ -479,13 +542,13 @@ function StopAgent({ name, executionId }: { name: string; executionId: string })
       onClick={stop}
       disabled={pending}
       aria-label={pending ? `Stopping ${name}` : `Stop ${name}`}
+      title={`Stop ${name}`}
       className={cn(
-        'v2-interactive ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-semibold text-foreground hover:bg-muted disabled:opacity-60',
+        'v2-interactive ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-(--deck-line) text-(--deck-fg) hover:bg-(--deck-paper) disabled:opacity-60',
         FOCUS_RING,
       )}
     >
       {pending ? <Loader2 aria-hidden className="size-2.5 motion-safe:animate-spin" /> : <Square aria-hidden className="size-2 fill-current" />}
-      Stop
     </button>
   );
 }

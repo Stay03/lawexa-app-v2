@@ -325,19 +325,35 @@ test('no "Ask again" while the chain is open: a new turn then would run beside t
   assert.match(here('rows', 'AssistantMessageRow.tsx'), /showRegenerate=\{isLast && canRegenerate\}/);
 });
 
-test('the deck wears the chat’s own plain look: colour only in the state mark (Stay, 26 November 2026: "too vibe coded")', () => {
+test('the deck is the round 8 A deck Stay chose: helpers slide out under their asker, tuck, fold, unfold (Stay, 26 November 2026)', () => {
   const deck = here('agents', 'AgentRoster.tsx');
-  // No tinted cards, coloured rings or glows, and no tinted helper slips.
-  for (const tint of [/bg-emerald-\d/, /bg-amber-\d/, /bg-primary\b(?!\/)/, /ring-emerald/, /ring-primary/, /shadow-\[/, /dark:bg-emerald/]) {
-    assert.doesNotMatch(deck, tint, String(tint));
-  }
-  // A card is the draft card's surface; a face is the step marker's neutral disc.
-  assert.match(deck, /className="flex flex-col rounded-2xl border border-border bg-card/);
-  assert.match(deck, /'flex shrink-0 items-center justify-center rounded-full bg-secondary font-semibold text-muted-foreground'/);
-  // Helpers are rows under a left rule, as a lookup sits under its step.
-  assert.match(deck, /<ul aria-label="Helpers" className="mb-2\.5 ml-\[29px\] mr-3 flex flex-col gap-0\.5 border-l border-border pl-3">/);
-  // The one mark of colour: working, done, failed.
-  assert.match(deck, /if \(tone === 'working'\) return <Loader2 aria-hidden className="size-3 shrink-0 text-primary motion-safe:animate-spin" \/>;/);
-  assert.match(deck, /if \(tone === 'done'\) return <Check aria-hidden strokeWidth=\{2\.5\} className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" \/>;/);
-  assert.match(deck, /if \(tone === 'failed'\) return <CircleAlert aria-hidden className="size-3 shrink-0 text-destructive" \/>;/);
+  const css = here('agents', 'deck.css');
+  // The mock's own sizes: a card, its face, a helper's card under it, narrower and overlapping its edge.
+  assert.match(css, /\.v2-deck-card \{[^}]*padding: 10px 14px;[^}]*border-radius: 14px;/);
+  assert.match(css, /\.v2-deck-slip \{[^}]*margin: -12px 10px 0;[^}]*padding: 18px 12px 8px;[^}]*border-radius: 0 0 12px 12px;/);
+  assert.match(css, /\.v2-deck-slip\.is-l2 \{[^}]*margin-left: 20px;[^}]*margin-right: 20px;/);
+  assert.match(css, /\.v2-deck-slip\.is-tucked \{[^}]*height: 28px;/);
+  assert.match(css, /\.v2-deck-face \{[^}]*width: 28px;[^}]*height: 28px;/);
+  // Colour as the mock: gold at work, green done, warm wash on a helper at work.
+  assert.match(css, /--deck-gold-wash: #fbf6ea;/);
+  assert.match(css, /--deck-ok-wash: #eef6f0;/);
+  // Motion: slide out, the tuck as a transition of one element, the fold and the unfold; short, eased, no bounce.
+  assert.match(css, /@keyframes v2-deck-slide-out/);
+  assert.match(css, /@keyframes v2-deck-fold-away/);
+  assert.match(css, /@keyframes v2-deck-unfold/);
+  assert.doesNotMatch(css, /cubic-bezier\([^)]*1\.[0-9]/, 'no overshoot curve (bounce)');
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  // The fold lands when its animation ends, keyed to the agents and their states; Hide folds the same way.
+  assert.match(deck, /if \(event\.target === event\.currentTarget && event\.animationName === 'v2-deck-fold-away'\) setLanded\(foldKey\);/);
+  assert.match(deck, /if \(!next\) setLanded\(null\);/);
+  // A helper is one element from slide out to tuck, so the tuck moves rather than swaps.
+  assert.match(deck, /'v2-deck-slip is-arriving',[\s\S]{0,200}tucked \? 'is-tucked'/);
+  // The popover as the mock's open state: 330px (the card's width on a phone), helpers 14px in, "waiting on its
+  // helper", the words the agent writes now with a gold caret, and Open its conversation in gold.
+  assert.match(deck, /w-\[330px\][^"]*max-sm:w-\(--radix-popover-trigger-width\)/);
+  assert.match(deck, /paddingLeft: `\$\{level \* 14\}px`/);
+  assert.equal((deck.match(/<StatusText status=\{waitingOnHelper\(status\)\} \/>/g) ?? []).length, 2, 'a slip and the popover');
+  assert.match(deck, /\{writingTail\(writing\)\}\s*<span aria-hidden className="v2-deck-caret" \/>/);
+  assert.match(deck, /text-\(--deck-gold\)[^\n]*\n\s*>\s*Open its conversation/);
+  assert.match(css, /\.v2-deck-caret \{[^}]*width: 2px;[^}]*height: 12px;[^}]*background: var\(--deck-gold\);/);
 });
