@@ -96,6 +96,12 @@ export interface SessionUser {
    */
   can_record: boolean;
   /**
+   * May this account dictate messages (the mic in the message box)?
+   * `user.can_dictate` from THIS page load's `/auth/me`, like `can_record`.
+   * `false` when the server does not send it.
+   */
+  can_dictate: boolean;
+  /**
    * Has the account finished onboarding? A completion date, or, for an
    * account that never started the current onboarding, a profession
    * (`onboarding-finished.ts`). The layout sends an unfinished account to
@@ -159,6 +165,7 @@ function toSessionDTO(
       // resource also describes other people (backend, 11 October 2026).
       can_access_team_channels: data?.can_access_team_channels === true,
       can_record: user.can_record === true,
+      can_dictate: user.can_dictate === true,
       onboarding_complete: onboardingFinished(user.profile),
       is_verified_author: user.is_verified_author === true,
       v2_intro_seen: typeof user.v2_intro_seen_at === 'string' && user.v2_intro_seen_at !== '',

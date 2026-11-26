@@ -218,8 +218,10 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
               sendHeldBy={surface.sendHeldBy}
               canStop={surface.canStop}
               // While the card's "Type my own answer" is on, the box's send is the card's answer.
-              onSubmit={(message, attachments, replyTo) =>
-                cardBox.answering ? cardBox.answer(message, attachments) : surface.submit(message, attachments, replyTo)
+              onSubmit={(message, attachments, replyTo, voiceClip) =>
+                cardBox.answering
+                  ? cardBox.answer(message, attachments)
+                  : surface.submit(message, attachments, replyTo, null, voiceClip)
               }
               onStop={surface.stop}
               viewerId={userId}

@@ -147,7 +147,7 @@ test('"Type my own answer" makes the box the field: the card sits on it, and its
   // Both hosts route the box's send through the card, and take its hint and its arrow's name.
   for (const host of [read(conversation, 'ChatDock.tsx'), caseChatCore()]) {
     assert.match(host, /const cardBox = useCardBox\(openCard, cardDock\);/);
-    assert.match(host, /cardBox\.answering \? cardBox\.answer\(message, attachments\)|if \(cardBox\.answering\) return cardBox\.answer\(message, attachments\);/);
+    assert.match(host, /cardBox\.answering\s*\?\s*cardBox\.answer\(message, attachments\)|if \(cardBox\.answering\) return cardBox\.answer\(message, attachments\);/);
     assert.match(host, /\{\.\.\.cardBox\.answering\}/);
     assert.match(host, /joinedAbove/);
   }

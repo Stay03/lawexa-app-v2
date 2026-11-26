@@ -4,6 +4,7 @@ import type { JurisdictionChoice } from './jurisdiction';
 import type { IBlockedReason } from './message-pack';
 import type { SkillDraftCard } from './skill-draft';
 import type { RedactionCategory } from './redaction';
+import type { VoiceClip } from './dictation';
 
 // Message role types
 export type MessageRole = 'user' | 'assistant' | 'tool';
@@ -87,6 +88,12 @@ export interface ChatMessage {
    * target the writer picked. Absent when the turn replies to nothing.
    */
   replyTo?: MessageReplyTo;
+  /**
+   * The voice of a dictated question (dictation, Arthur 25 November 2026):
+   * the server's {@link ApiMessage.voice_clip}, or, on the row this client
+   * drew, the clip it just uploaded. Absent on a typed question.
+   */
+  voiceClip?: VoiceClip;
   /**
    * The people this question tags (space chats): the server's
    * {@link ApiMessage.mentions}. A reader outside the space gets names only,
@@ -851,6 +858,10 @@ export interface ChatStartRequest {
   // conversation_id; a target outside the chat, a step, an error or a deleted
   // row is one 422 on this field.
   reply_to_message_id?: number;
+  // The voice of a dictated message (POST /dictation/clips): the sender's own
+  // unused clip. A confidential or redacted chat refuses it (422), so the app
+  // never sends one there.
+  voice_clip_id?: number;
 }
 
 export interface ChatStartResponse {
@@ -961,6 +972,8 @@ export interface SendMessageOptions {
   replyTo?: MessageReplyTo;
   /** Answers to an open question card: sent as question_answers, and drawn as their bubble. */
   questionAnswers?: QuestionCardAnswers;
+  /** The voice of a dictated message: sent as voice_clip_id, and drawn under the question. */
+  voiceClip?: VoiceClip;
 }
 
 // Chat state for hook
@@ -1111,6 +1124,8 @@ export interface ApiMessage {
   author?: ConversationAuthor | null;
   /** The message this row replies to; `null` when it replies to nothing. Absent on a server before replies. */
   reply_to?: MessageReplyTo | null;
+  /** The kept voice of a dictated message; `null` when it was typed. Absent on a server before dictation. */
+  voice_clip?: VoiceClip | null;
   /** On an assistant message: whose own template or skill it used (thread 9ae498ae). */
   used_private_items?: UsedPrivateItem[];
   /** The people tagged in this row (`[]` when none, and in personal chats). */

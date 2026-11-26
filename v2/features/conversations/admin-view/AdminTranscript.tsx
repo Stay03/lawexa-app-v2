@@ -95,6 +95,7 @@ export function AdminTranscript({
           isLawyer={false}
           canAccessTeamChannels={false}
           canRecord={false}
+          canDictate={false}
           isVerifiedAuthor={false}
           mayHaveWrapped={false}
           wrappedHidden

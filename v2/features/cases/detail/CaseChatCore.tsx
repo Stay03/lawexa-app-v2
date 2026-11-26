@@ -646,12 +646,14 @@ export function CaseChatComposerDock({
                 // no Stop, as on the chat's own screen (Spaces F4).
                 sendHeldBy={surface ? surface.sendHeldBy : null}
                 canStop={surface ? surface.canStop : true}
-                onSubmit={async (message, attachments) => {
+                // A first question starts a new chat, whose send takes no voice: the dictated words go alone.
+                dictationKeepsVoice={surface !== null}
+                onSubmit={async (message, attachments, _replyTo, voiceClip) => {
                   // While the card's "Type my own answer" is on, the box's send is the card's answer.
                   if (cardBox.answering) return cardBox.answer(message, attachments);
                   // A refused send comes back to the composer, which gives the
                   // message back and says why.
-                  if (surface) return surface.submit(message, attachments);
+                  if (surface) return surface.submit(message, attachments, null, null, voiceClip);
                   const ok = await start.start(message, attachments);
                   // The composer clears its draft optimistically; a failed create
                   // hands the text back for the retry. Attachments are the one

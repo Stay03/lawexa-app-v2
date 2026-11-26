@@ -100,8 +100,11 @@ test('holdSend holds Send and Enter only: the textarea stays live', () => {
   assert.match(composer, /!disabled &&\s*!holdSend;/);
   assert.match(
     composer,
-    /if \(isStreaming \|\| isSubmitting \|\| isUploading \|\| hasFailedUpload \|\| disabled \|\| holdSend\) return;/,
+    /const sendHeld = isStreaming \|\| isUploading \|\| hasFailedUpload \|\| disabled \|\| holdSend;/,
   );
+  // A typed send and a dictated one both wait on it.
+  assert.match(composer, /const handleSubmit = async \(\) => \{\s*if \(sendHeld \|\| isSubmitting\) return;/);
+  assert.match(composer, /const sendDictated = [\s\S]*?if \(sendHeld \|\| isSubmitting\) \{/);
   // The textarea's own lock and the dimming read `disabled` alone.
   assert.match(composer, /disabled=\{ownTurnRunning \|\| isSubmitting \|\| disabled\}/);
   assert.doesNotMatch(composer, /disabled=\{[^}]*holdSend/);

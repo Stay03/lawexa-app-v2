@@ -64,6 +64,12 @@ import { usePastedContent } from './usePastedContent';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { RecordingConsent, RecordingPanel } from '@/v2/features/recording/RecorderPanel';
 import { useRecorder } from '@/v2/features/recording/use-recorder';
+import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
+import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
+import { dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
+import type { DictationResult } from '@/v2/features/dictation/dictation-controller';
+import { dictationApi } from '@/lib/api/dictation';
+import type { VoiceClip } from '@/types/dictation';
 
 /**
  * ConversationComposer — the FLOATING PILL for the conversation screen. It is rendered
@@ -208,6 +214,8 @@ export interface ConversationComposerProps {
     message: string,
     attachments: MessageAttachment[],
     replyTo: MessageReplyTo | null,
+    /** The voice of a dictated message, already uploaded; absent when typed. */
+    voiceClip?: VoiceClip | null,
   ) => Promise<SendRefused | undefined>;
   onStop: () => void;
   /** Textarea placeholder — embedding surfaces brand it ("Ask about this case"). */
@@ -293,6 +301,13 @@ export interface ConversationComposerProps {
   recordInto?: string | null;
   /** The chat's title, at the top of the phone's recording screen. */
   recordingTitle?: string | null;
+  /**
+   * Whether a dictated message here keeps its voice. False where the send
+   * cannot carry one (a document's first question, which starts a new chat):
+   * the words go alone. Confidential and redacted chats never keep it.
+   * Default true.
+   */
+  dictationKeepsVoice?: boolean;
 }
 
 export function ConversationComposer({
@@ -324,6 +339,7 @@ export function ConversationComposer({
   spaceUuid = null,
   recordInto = null,
   recordingTitle = null,
+  dictationKeepsVoice = true,
 }: ConversationComposerProps) {
   // A card joined on top takes the jurisdiction row's place: nothing sits between the two.
   const showMeta = showMetaProp && !joinedAbove;
@@ -413,7 +429,8 @@ export function ConversationComposer({
   const [errorPlans, setErrorPlans] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Recording a meeting (thread ac47b1df): the recorder takes the box's place while it runs.
-  const { canRecord } = useV2Session();
+  // Dictation (Arthur, 25 November 2026, design A2): staff first, behind `user.can_dictate`.
+  const { canRecord, canDictate } = useV2Session();
   // Never in a confidential or redacted chat: the server refuses both (422 not_recordable, Backend 21 November 2026).
   const recordable = recordInto !== null && canRecord && !isConfidential && !isRedacted;
   const { state: recording, recorder } = useRecorder({ conversation_uuid: recordInto ?? '' });
@@ -582,9 +599,9 @@ export function ConversationComposer({
     }, CHIP_EXIT_MS);
   };
 
-  const handleSubmit = async () => {
-    if (isStreaming || isSubmitting || isUploading || hasFailedUpload || disabled || holdSend) return;
-    const fullMessage = serializePastedContent(pastedItems.map((i) => i.text), input);
+  /** The draft goes: `typed` is the box's words, typed or dictated, with the voice when kept. */
+  const sendDraft = async (typed: string, voiceClip: VoiceClip | null) => {
+    const fullMessage = serializePastedContent(pastedItems.map((i) => i.text), typed);
     if (!fullMessage) return;
 
     const attachmentsSnapshot: MessageAttachment[] = uploadedFiles.map((u) => ({
@@ -596,7 +613,7 @@ export function ConversationComposer({
 
     // The draft clears as the message goes, and is kept here until the send is
     // answered, so a refusal can give it all back.
-    const draft = { input, pasted: pastedItems.map((i) => i.text), uploads, reply: replyTo };
+    const draft = { input: typed, pasted: pastedItems.map((i) => i.text), uploads, reply: replyTo };
     setInput('');
     clearPasted();
     setUploads([]);
@@ -605,7 +622,7 @@ export function ConversationComposer({
     setIsSubmitting(true);
     let outcome: SendRefused | undefined;
     try {
-      outcome = await onSubmit(fullMessage, attachmentsSnapshot, draft.reply);
+      outcome = await onSubmit(fullMessage, attachmentsSnapshot, draft.reply, voiceClip);
     } finally {
       setIsSubmitting(false);
       // A sent tray is gone, so every thumbnail made for it is released here.
@@ -623,6 +640,51 @@ export function ConversationComposer({
     // Over the plan's files limit: a fault to fix (remove a file), with the plans when a bigger one allows more.
     if (outcome.refused) showError(outcome.refused, outcome.limit ? 'error' : 'notice', outcome.limit?.plans === true);
   };
+
+  const sendHeld = isStreaming || isUploading || hasFailedUpload || disabled || holdSend;
+
+  const handleSubmit = async () => {
+    if (sendHeld || isSubmitting) return;
+    await sendDraft(input, null);
+  };
+
+  // ── Dictation (design A2) ──────────────────────────────────────────────
+  const voiceKept = dictationKeepsVoice && keepsVoice({ isConfidential, isRedacted });
+  /** Listening ended with Send: the voice goes up (when kept), then the words go with its id. */
+  const sendDictated = async ({ text, clip, durationMs }: DictationResult) => {
+    // A turn or a file holds Send: the words wait in the box as typed words.
+    if (sendHeld || isSubmitting) {
+      updateInput((current) => joinText(current, text));
+      return;
+    }
+    let voiceClip: VoiceClip | null = null;
+    let voiceLost = false;
+    setIsSubmitting(true);
+    try {
+      if (clip && voiceKept) {
+        try {
+          const answer = await dictationApi.uploadClip(clip, durationMs);
+          // The row plays the clip from memory until the transcript's signed url replaces it.
+          if (answer.data) voiceClip = { id: answer.data.id, url: URL.createObjectURL(clip), duration_ms: answer.data.duration_ms };
+          else voiceLost = true;
+        } catch {
+          voiceLost = true;
+        }
+      }
+      await sendDraft(text, voiceClip);
+    } finally {
+      setIsSubmitting(false);
+    }
+    if (voiceLost) showError('Your message went without its voice. The voice did not upload.', 'notice');
+  };
+  const { state: dictating, dictation } = useDictation({
+    onSend: (result) => void sendDictated(result),
+    onProblem: (kind, message) => showError(dictationProblemLine(kind, message)),
+  });
+  const dictationOpen = isDictating(dictating);
+  // Dictate holds Send's place while the box is empty; Send takes it back once there is something to send.
+  const offerDictate =
+    canDictate && !dictationOpen && input.trim() === '' && uploads.length === 0 && pastedItems.length === 0;
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
@@ -948,7 +1010,9 @@ export function ConversationComposer({
           </>
         ) : null}
 
-        {/* ── The pill: the PromptInput card holds ONLY the single input row. ── */}
+        <DictationCountdown state={dictating} dictation={dictation} />
+
+        {/* ── The pill: the PromptInput card holds ONLY the single input row (or a dictation). ── */}
         {recordable && recorderOpen ? null : (
         <PromptInput
           value={input}
@@ -969,150 +1033,179 @@ export function ConversationComposer({
           className="shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]"
           joinedAbove={joinedAbove}
         >
-          {/* ── The single input row: + menu | textarea | Send/Stop. ── */}
-          <div className="flex items-end gap-1.5">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Attach files and privacy options"
-                  onClick={(event) => {
-                    stop(event);
-                    onEngage?.();
-                  }}
-                  disabled={ownTurnRunning || isSubmitting || disabled}
-                  className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Plus className="size-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-72" onClick={stop}>
-                <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
-                  <Paperclip className="text-muted-foreground" />
-                  <span className="flex-1">Attach files</span>
-                  {/* THE LIMIT IS STATED WHERE THE CHOICE IS MADE. A person who
-                      picks an 8MB photo should learn it here, not from a 422
-                      after watching it upload. Two numbers because the caps
-                      genuinely differ, and one of them would be a lie. */}
-                  <span className="text-muted-foreground text-xs">
-                    {attachmentHintIn(privateMode, uploadLimits, fileRule)}
-                  </span>
-                </DropdownMenuItem>
+          {dictationOpen ? (
+            <DictationPanel state={dictating} dictation={dictation} canSend={!sendHeld} isSending={isSubmitting} />
+          ) : (
+            /* ── The single input row: + menu | textarea | Dictate/Send/Stop. ── */
+            <div className="flex items-end gap-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Attach files and privacy options"
+                    onClick={(event) => {
+                      stop(event);
+                      onEngage?.();
+                    }}
+                    disabled={ownTurnRunning || isSubmitting || disabled}
+                    className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-72" onClick={stop}>
+                  <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+                    <Paperclip className="text-muted-foreground" />
+                    <span className="flex-1">Attach files</span>
+                    {/* THE LIMIT IS STATED WHERE THE CHOICE IS MADE. A person who
+                        picks an 8MB photo should learn it here, not from a 422
+                        after watching it upload. Two numbers because the caps
+                        genuinely differ, and one of them would be a lie. */}
+                    <span className="text-muted-foreground text-xs">
+                      {attachmentHintIn(privateMode, uploadLimits, fileRule)}
+                    </span>
+                  </DropdownMenuItem>
+                  {recordable && canDictate ? (
+                    <DropdownMenuItem onSelect={recorder.ask}>
+                      <Mic className="text-muted-foreground" />
+                      <span className="flex-1">Record a meeting</span>
+                    </DropdownMenuItem>
+                  ) : null}
 
-                {(isRedacted || isConfidential) && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Privacy (locked for this chat)</DropdownMenuLabel>
-                    {isRedacted && (
-                      <DropdownMenuCheckboxItem
-                        checked
-                        disabled
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        <VenetianMask className="text-indigo-500" />
-                        <span className="flex flex-col">
-                          <span className="font-medium leading-tight">Redacted mode</span>
-                          <span className="text-muted-foreground text-xs">
-                            {hiddenNames ? `Hides ${hiddenNames} from the model` : 'Hides personal details from the model'}
+                  {(isRedacted || isConfidential) && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Privacy (locked for this chat)</DropdownMenuLabel>
+                      {isRedacted && (
+                        <DropdownMenuCheckboxItem
+                          checked
+                          disabled
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          <VenetianMask className="text-indigo-500" />
+                          <span className="flex flex-col">
+                            <span className="font-medium leading-tight">Redacted mode</span>
+                            <span className="text-muted-foreground text-xs">
+                              {hiddenNames ? `Hides ${hiddenNames} from the model` : 'Hides personal details from the model'}
+                            </span>
                           </span>
-                        </span>
-                      </DropdownMenuCheckboxItem>
-                    )}
-                    {isConfidential && (
-                      <DropdownMenuCheckboxItem
-                        checked
-                        disabled
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        <ShieldCheck className="text-emerald-600 dark:text-emerald-500" />
-                        <span className="flex flex-col">
-                          <span className="font-medium leading-tight">Confidential mode</span>
-                          <span className="text-muted-foreground text-xs">
-                            Stored only on this device until you delete it
+                        </DropdownMenuCheckboxItem>
+                      )}
+                      {isConfidential && (
+                        <DropdownMenuCheckboxItem
+                          checked
+                          disabled
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          <ShieldCheck className="text-emerald-600 dark:text-emerald-500" />
+                          <span className="flex flex-col">
+                            <span className="font-medium leading-tight">Confidential mode</span>
+                            <span className="text-muted-foreground text-xs">
+                              Stored only on this device until you delete it
+                            </span>
                           </span>
-                        </span>
-                      </DropdownMenuCheckboxItem>
+                        </DropdownMenuCheckboxItem>
+                      )}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <PromptInputTextarea
+                placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
+                onFocus={onEngage}
+                // The `@` picker's keys, caret and combobox (mention-picker.tsx).
+                {...mentionPicker.textareaProps}
+                // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
+                // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
+                className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
+                // Measured only when it has text: a measurement lays out the whole
+                // transcript behind it, which cost an open ~200 ms (prompt-input.tsx).
+                lazyAutosize
+                onLargePaste={addPasted}
+                /* A pasted picture goes down the SAME path as one chosen with the
+                   attach button, so the type check, the size cap, the duplicate
+                   check and the chip are all one implementation rather than two
+                   that can drift. */
+                onPasteFiles={(files) => void handleFilesAdded(files)}
+              />
+
+              {recordable && !canDictate ? (
+                <PromptInputAction tooltip="Record a meeting">
+                  <button
+                    type="button"
+                    aria-label="Record a meeting"
+                    onClick={recorder.ask}
+                    disabled={ownTurnRunning || isSubmitting || disabled}
+                    className="v2-interactive text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Mic className="size-4" />
+                  </button>
+                </PromptInputAction>
+              ) : null}
+
+              {isStreaming && canStop ? (
+                <PromptInputAction tooltip={isCancelling ? 'Cancelling' : 'Stop generating'}>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="destructive"
+                    className="v2-interactive size-8 shrink-0 rounded-full disabled:opacity-70"
+                    onClick={onStop}
+                    disabled={isCancelling}
+                    aria-label={isCancelling ? 'Cancelling' : 'Stop generating'}
+                  >
+                    {isCancelling ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Square className="size-4" />
                     )}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <PromptInputTextarea
-              placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
-              onFocus={onEngage}
-              // The `@` picker's keys, caret and combobox (mention-picker.tsx).
-              {...mentionPicker.textareaProps}
-              // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
-              // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
-              className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
-              // Measured only when it has text: a measurement lays out the whole
-              // transcript behind it, which cost an open ~200 ms (prompt-input.tsx).
-              lazyAutosize
-              onLargePaste={addPasted}
-              /* A pasted picture goes down the SAME path as one chosen with the
-                 attach button, so the type check, the size cap, the duplicate
-                 check and the chip are all one implementation rather than two
-                 that can drift. */
-              onPasteFiles={(files) => void handleFilesAdded(files)}
-            />
-
-            {recordable ? (
-              <PromptInputAction tooltip="Record a meeting">
-                <button
-                  type="button"
-                  aria-label="Record a meeting"
-                  onClick={recorder.ask}
-                  disabled={ownTurnRunning || isSubmitting || disabled}
-                  className="v2-interactive text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Mic className="size-4" />
-                </button>
-              </PromptInputAction>
-            ) : null}
-
-            {isStreaming && canStop ? (
-              <PromptInputAction tooltip={isCancelling ? 'Cancelling' : 'Stop generating'}>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="destructive"
-                  className="v2-interactive size-8 shrink-0 rounded-full disabled:opacity-70"
-                  onClick={onStop}
-                  disabled={isCancelling}
-                  aria-label={isCancelling ? 'Cancelling' : 'Stop generating'}
-                >
-                  {isCancelling ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Square className="size-4" />
-                  )}
-                </Button>
-              </PromptInputAction>
-            ) : (
-              // While a turn runs that this reader may not stop (a colleague's,
-              // Spaces F4), Send stays in place, held, and says whose answer it
-              // waits for.
-              <PromptInputAction tooltip={arrowLabel}>
-                <Button
-                  type="button"
-                  size="icon"
-                  className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
-                  onClick={handleSubmit}
-                  disabled={!canSend || isStreaming}
-                  aria-label={arrowLabel}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <ArrowUp className="size-4" />
-                  )}
-                </Button>
-              </PromptInputAction>
-            )}
-          </div>
+                  </Button>
+                </PromptInputAction>
+              ) : offerDictate ? (
+                <PromptInputAction tooltip="Dictate">
+                  <button
+                    type="button"
+                    aria-label="Dictate"
+                    onClick={(event) => {
+                      stop(event);
+                      if (errorOpen) hideError();
+                      onEngage?.();
+                      void dictation.start();
+                    }}
+                    disabled={isSubmitting || disabled}
+                    className="v2-interactive text-foreground hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Mic className="size-4" />
+                  </button>
+                </PromptInputAction>
+              ) : (
+                // While a turn runs that this reader may not stop (a colleague's,
+                // Spaces F4), Send stays in place, held, and says whose answer it
+                // waits for.
+                <PromptInputAction tooltip={arrowLabel}>
+                  <Button
+                    type="button"
+                    size="icon"
+                    className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
+                    onClick={handleSubmit}
+                    disabled={!canSend || isStreaming}
+                    aria-label={arrowLabel}
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <ArrowUp className="size-4" />
+                    )}
+                  </Button>
+                </PromptInputAction>
+              )}
+            </div>
+          )}
         </PromptInput>
         )}
+
+        {dictationOpen ? <DictationHint state={dictating} /> : null}
 
         <FileUploadContent>
           <div className="flex min-h-[200px] w-full items-center justify-center">

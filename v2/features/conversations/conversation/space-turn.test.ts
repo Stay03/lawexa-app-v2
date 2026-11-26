@@ -335,8 +335,8 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
 
 test('the composer gives a refused message back, with its pasted cards and files, and says why', () => {
   const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /const draft = \{ input, pasted: pastedItems\.map\(\(i\) => i\.text\), uploads, reply: replyTo \};/);
-  assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot, draft\.reply\);/);
+  assert.match(composer, /const draft = \{ input: typed, pasted: pastedItems\.map\(\(i\) => i\.text\), uploads, reply: replyTo \};/);
+  assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot, draft\.reply, voiceClip\);/);
   assert.match(
     composer,
     /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*(\/\/[^\n]*\n\s*)*if \(draft\.reply && !outcome\.dropReply\) updateReply\(\(current\) => current \?\? draft\.reply\);\s*(\/\/[^\n]*\n\s*)*if \(outcome\.refused\) showError\(outcome\.refused, outcome\.limit \? 'error' : 'notice', outcome\.limit\?\.plans === true\);/,
@@ -347,12 +347,14 @@ test('the composer gives a refused message back, with its pasted cards and files
   assert.match(composer, /errorTone === 'notice'\s*\? 'text-muted-foreground px-1 text-xs'\s*: 'border-destructive\/40 bg-destructive\/10 text-destructive rounded-xl border px-3 py-2 text-sm',/);
   assert.match(composer, /errorTone === 'notice' \? \(\s*<Clock className="mt-px size-3\.5 shrink-0" aria-hidden \/>\s*\) : \(\s*<AlertCircle/);
   assert.match(composer, /const showError = \(message: string, tone: 'error' \| 'notice' = 'error', plans = false\) => \{/);
-  // Every file error still calls showError with the default (red) tone.
-  assert.equal(composer.match(/showError\([^)]*'notice'/g)?.length, 1, 'only the refused send passes notice');
+  // Every file error still calls showError with the default (red) tone. The two
+  // quiet ones: the refused send, and a dictated message that went without its voice.
+  assert.equal(composer.match(/showError\([^)]*'notice'/g)?.length, 2, 'only the refused send and the lost voice pass notice');
+  assert.match(composer, /if \(voiceLost\) showError\('[^']+', 'notice'\);/);
   // A sent tray's thumbnails are released only once the send was taken.
   assert.match(composer, /if \(!outcome\) for \(const u of draft\.uploads\) if \(u\.preview\) URL\.revokeObjectURL\(u\.preview\);/);
   // The case dock passes the refusal through.
-  assert.match(read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx'), /if \(surface\) return surface\.submit\(message, attachments\);/);
+  assert.match(read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx'), /if \(surface\) return surface\.submit\(message, attachments, null, null, voiceClip\);/);
 });
 
 test('a send moves its chat to the top of the owner’s lists once, with no second row', () => {

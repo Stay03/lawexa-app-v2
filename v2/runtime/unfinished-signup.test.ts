@@ -29,6 +29,7 @@ const user = (over: Partial<SessionUser> = {}): SessionUser => ({
   is_lawyer: false,
   can_access_team_channels: false,
   can_record: false,
+  can_dictate: false,
   onboarding_complete: true,
   is_verified_author: false,
   v2_intro_seen: false,

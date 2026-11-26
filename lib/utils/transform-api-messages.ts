@@ -283,6 +283,8 @@ export function transformApiMessages(
         ...(apiMsg.author !== undefined && { author: apiMsg.author }),
         // The message it replies to (space chat replies); absent when none.
         ...(apiMsg.reply_to && { replyTo: apiMsg.reply_to }),
+        // The kept voice of a dictated question.
+        ...(apiMsg.voice_clip && { voiceClip: apiMsg.voice_clip }),
         // Who it tags, and what the writer typed that tagged nobody (space chats).
         ...(apiMsg.mentions && apiMsg.mentions.length > 0 && { mentions: apiMsg.mentions }),
         ...(apiMsg.unmatched_handles &&

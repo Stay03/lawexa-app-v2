@@ -1,0 +1,10 @@
+/* Dictation in the message box (DictationPanel): the Undo ring empties over
+   the 2 seconds a spoken "send" waits. */
+@keyframes dictation-ring {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 100;
+  }
+}

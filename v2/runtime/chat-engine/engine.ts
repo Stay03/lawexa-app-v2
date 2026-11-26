@@ -2508,6 +2508,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     const optimisticMsg = addUserMessage(message, shownAttachments, options.replyTo);
     // Answers to a question card: the row is drawn as a bubble of the questions and answers.
     const questionAnswers = options.questionAnswers;
+    // A dictated question carries its voice, drawn under it at once.
+    const voiceClip = options.voiceClip;
+    if (voiceClip) {
+      setMessages((msgs) => msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, voiceClip } : m)));
+    }
     if (questionAnswers) {
       setMessages((msgs) => msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, cardAnswers: questionAnswers } : m)));
     }
@@ -2531,6 +2536,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         ...(isConfidentialTurnN && { messages: priorHistory }),
         // A reply names its target by its saved id (space chat replies).
         ...(convId && options.replyTo && { reply_to_message_id: options.replyTo.id }),
+        ...(voiceClip && { voice_clip_id: voiceClip.id }),
         // Answers to the open question card, one per question in order. A
         // confidential chat's card has no saved id: its answers are the message.
         ...(convId &&

@@ -28,6 +28,7 @@ import { stripPastedTags } from '@/lib/utils';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import { readRedactionCategories } from '@/lib/utils/redaction-categories';
 import type { RedactionCategory } from '@/types/redaction';
+import type { VoiceClip } from '@/types/dictation';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { useStreamStyle } from '@/v2/stream-style';
 import { conversationsCache, listedConversation, spaceOfListedChat } from '../cache';
@@ -336,6 +337,8 @@ export interface ConversationController {
     replyTo?: MessageReplyTo | null,
     /** Answers to the open question card, sent with `message` as their line. */
     questionAnswers?: QuestionCardAnswers | null,
+    /** The voice of a dictated message, already uploaded. */
+    voiceClip?: VoiceClip | null,
   ) => Promise<SendRefused | undefined>;
   /** Graceful cancel (cancel POST; the engine waits for the terminal SSE event). */
   stop: () => void;
@@ -1265,6 +1268,7 @@ export function useConversationController(
       replyTo: MessageReplyTo | null = null,
       /** Answers to the open question card, sent with `message` as their line. */
       questionAnswers: QuestionCardAnswers | null = null,
+      voiceClip: VoiceClip | null = null,
     ) => {
       // The last status read is from before this send: dropped, so a stale
       // "pending, by a colleague" can never label the reader's own turn, and
@@ -1287,6 +1291,7 @@ export function useConversationController(
         ...(fileIds.length > 0 && { fileIds, attachments }),
         ...(questionAnswers && { questionAnswers }),
         ...(replyTo && { replyTo }),
+        ...(voiceClip && { voiceClip }),
       });
       if (refusal === null) return undefined;
       takeRefusal(refusal);

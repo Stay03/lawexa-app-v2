@@ -114,16 +114,16 @@ test('a row from the server keeps its reply_to; a row that replies to nothing ha
 
 test('the engine sends reply_to_message_id, on a retry too, and draws the quote on its own row', () => {
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
-  assert.match(engine, /\.\.\.\(convId && options\.replyTo && \{ reply_to_message_id: options\.replyTo\.id \}\),\n[\s\S]{0,700}?\n {6}\};\n {6}const response = await chatApi\.start\(applyJurisdiction\(baseBody, choice\)\);/);
+  assert.match(engine, /\.\.\.\(convId && options\.replyTo && \{ reply_to_message_id: options\.replyTo\.id \}\),\n[\s\S]{0,800}?\n {6}\};\n {6}const response = await chatApi\.start\(applyJurisdiction\(baseBody, choice\)\);/);
   assert.match(engine, /\.\.\.\(originalMsg\.replyTo && \{ reply_to_message_id: originalMsg\.replyTo\.id \}\),/);
   // The files as the chat shows them: "Document 1, 2…" in a redacted chat (document-labels.ts).
   assert.match(engine, /const optimisticMsg = addUserMessage\(message, shownAttachments, options\.replyTo\);/);
   assert.match(engine, /drawnHere: true,\n {6}\.\.\.\(replyTo && \{ replyTo \}\),/);
   const types = read('types', 'chat.ts');
-  assert.match(types, /reply_to_message_id\?: number;\n\}/);
+  assert.match(types, /reply_to_message_id\?: number;\n[\s\S]{0,300}?voice_clip_id\?: number;\n\}/);
   assert.match(types, /reply_to\?: MessageReplyTo \| null;/);
   const controller = readHere('useConversationController.ts');
-  assert.match(controller, /\.\.\.\(replyTo && \{ replyTo \}\),\n {6}\}\);/);
+  assert.match(controller, /\.\.\.\(replyTo && \{ replyTo \}\),\n( {8}\.\.\.\(voiceClip && \{ voiceClip \}\),\n)? {6}\}\);/);
 });
 
 test('?m= is a positive whole number or nothing', () => {

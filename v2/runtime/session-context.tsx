@@ -159,6 +159,12 @@ export interface V2SessionSnapshot {
    */
   readonly canRecord: boolean;
   /**
+   * May this account dictate messages? The server's `user.can_dictate` from
+   * this page load's `/auth/me` (staff first). Presentation only: the
+   * dictation API answers 403 without the flag. `false` when signed out.
+   */
+  readonly canDictate: boolean;
+  /**
    * May this account publish a quiz to everyone (`visibility: public`)? The
    * server's `user.is_verified_author` from `/auth/me` (21 October 2026).
    * Presentation only: it decides whether the quiz form and the visibility
@@ -212,6 +218,7 @@ export function V2SessionProvider({
   isLawyer,
   canAccessTeamChannels,
   canRecord,
+  canDictate,
   isVerifiedAuthor,
   mayHaveWrapped,
   wrappedHidden,
@@ -236,6 +243,7 @@ export function V2SessionProvider({
       isLawyer,
       canAccessTeamChannels,
       canRecord,
+      canDictate,
       isVerifiedAuthor,
       mayHaveWrapped,
       wrappedHidden,
@@ -258,6 +266,7 @@ export function V2SessionProvider({
       isLawyer,
       canAccessTeamChannels,
       canRecord,
+      canDictate,
       isVerifiedAuthor,
       mayHaveWrapped,
       wrappedHidden,
