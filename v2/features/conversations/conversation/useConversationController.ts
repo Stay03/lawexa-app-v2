@@ -1377,9 +1377,15 @@ export function useConversationController(
     );
   }, [messages]);
 
+  // While the agents Lawexa asked still work (the chain is open), its "I've
+  // asked…" line offers no "Ask again": a new turn then would run beside the
+  // chain. It returns once the answer has come (Techlead, CH3 run 3, 26
+  // November 2026).
+  const chainOpen = agentChain?.chain_open === true;
   const canRegenerate =
     isOwner &&
     !isStreaming &&
+    !chainOpen &&
     lastIsCompletedAssistant &&
     !endsWithGiveUp &&
     lastUserTurn !== null &&

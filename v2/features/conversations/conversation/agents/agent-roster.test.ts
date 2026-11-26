@@ -315,3 +315,12 @@ test('one stream per running turn, shared by its card, popover and panel; the po
   assert.doesNotMatch(deck, /PopoverAnchor|aria-label=\{`\$\{node\.name\}/);
   assert.match(deck, /if \(!byKeyboard\.current\) event\.preventDefault\(\);/);
 });
+
+test('no "Ask again" while the chain is open: a new turn then would run beside the agents (Techlead, CH3 run 3, 26 November 2026)', () => {
+  const controller = here('useConversationController.ts');
+  assert.match(controller, /const chainOpen = agentChain\?\.chain_open === true;/);
+  assert.match(controller, /const canRegenerate =\s*isOwner &&\s*!isStreaming &&\s*!chainOpen &&/);
+  // The chain is read before it is used, and "Ask again" is drawn only from canRegenerate.
+  assert.ok(controller.indexOf('const agentChain = ') < controller.indexOf('const chainOpen = '));
+  assert.match(here('rows', 'AssistantMessageRow.tsx'), /showRegenerate=\{isLast && canRegenerate\}/);
+});
