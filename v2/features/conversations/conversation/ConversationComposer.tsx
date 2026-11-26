@@ -65,6 +65,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { RecordingConsent, RecordingPanel } from '@/v2/features/recording/RecorderPanel';
 import { useRecorder } from '@/v2/features/recording/use-recorder';
 import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
+import { DictateButton } from '@/v2/features/dictation/DictateButton';
 import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
 import { dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
 import type { DictationResult } from '@/v2/features/dictation/dictation-controller';
@@ -1025,7 +1026,8 @@ export function ConversationComposer({
           }}
           onSubmit={handleSubmit}
           disabled={ownTurnRunning || isSubmitting || disabled}
-          maxHeight={150}
+          // Never more than a third of the visible screen (a phone with its keyboard up), as dictation's words.
+          maxHeight="min(150px, 30dvh)"
           variant={isConfidential ? 'confidential' : 'default'}
           onClick={onEngage}
           // Downward-biased soft drop (not shadow-lg) so the floating pill casts NO
@@ -1164,20 +1166,14 @@ export function ConversationComposer({
                 </PromptInputAction>
               ) : offerDictate ? (
                 <PromptInputAction tooltip="Dictate">
-                  <button
-                    type="button"
-                    aria-label="Dictate"
-                    onClick={(event) => {
-                      stop(event);
+                  <DictateButton
+                    onStart={() => {
                       if (errorOpen) hideError();
                       onEngage?.();
                       void dictation.start();
                     }}
                     disabled={isSubmitting || disabled}
-                    className="v2-interactive text-foreground hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Mic className="size-4" />
-                  </button>
+                  />
                 </PromptInputAction>
               ) : (
                 // While a turn runs that this reader may not stop (a colleague's,

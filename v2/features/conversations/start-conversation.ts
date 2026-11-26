@@ -105,6 +105,13 @@ export interface StartConversationInput {
    * sender's, or is off.
    */
   useItems?: UseItem[];
+  /**
+   * A dictated first message's voice, already uploaded (POST /dictation/clips):
+   * sent as `voice_clip_id` (Arthur, 26 November 2026, the homepage box). The
+   * server refuses it (422) in a new confidential or redacted chat, so the box
+   * never sends one there.
+   */
+  voiceClipId?: number;
 }
 
 export interface StartConversationDeps {
@@ -321,6 +328,8 @@ export async function startConversation(
       ...(spaceUuid !== undefined && { space_uuid: spaceUuid }),
       // The person's own item for this message ("Use in chat").
       ...(input.useItems && input.useItems.length > 0 && { use_items: input.useItems }),
+      // A dictated message's voice; never in a private mode (the server refuses it there).
+      ...(input.voiceClipId !== undefined && !confidential && !redacted && { voice_clip_id: input.voiceClipId }),
     };
     const post = (clientRequestId: string) =>
       chatApi.start(applyJurisdiction({ ...baseBody, client_request_id: clientRequestId }, jurisdiction));
