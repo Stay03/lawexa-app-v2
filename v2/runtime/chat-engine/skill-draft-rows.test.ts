@@ -79,5 +79,5 @@ test('the card sits under the answer once its turn is over, and the engine can s
   const card = readFileSync(join(here, '..', '..', 'features', 'conversations', 'conversation', 'skill-draft', 'SkillDraftCard.tsx'), 'utf8');
   assert.match(card, /onSuccess: \(status\) => \{\s*chat\?\.settleSkillDraft\(card\.draft, status\);/);
   // The steps are asked for only when the card is opened.
-  assert.match(card, /queryFn: \(\) => skillDraftsApi\.get\(card\.draft\),\s*enabled: open,/);
+  assert.match(card, /queryFn: \(\) => held\.skillDraft\(card\.draft\),\s*enabled: open,/);
 });

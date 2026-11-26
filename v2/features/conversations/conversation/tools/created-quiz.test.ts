@@ -153,7 +153,7 @@ test('the cards read every quiz step loaded, through the same cache the card rea
   assert.match(cards, /const quizSteps = steps\.filter\(isQuizCardStep\);\s*const loaded = useToolResults\(quizSteps\);\s*return quizCards\(loaded\)\.map\(\(entry\) => <CreatedQuizCard key=\{entry\.key\} message=\{entry\.step\} refused=\{entry\.refused\} \/>\);/);
   const hook = readFileSync(join(here, 'use-tool-result.ts'), 'utf8');
   // One query shape for one step and for many, so the key is the same and nothing is fetched twice.
-  assert.match(hook, /const \{ needed, options \} = toolResultQuery\(conversationId, message, enabled\);\s*const query = useQuery\(options\);/);
+  assert.match(hook, /const \{ needed, options \} = toolResultQuery\(conversationId, message, enabled, source\);\s*const query = useQuery\(options\);/);
   assert.match(hook, /const queries = useQueries\(\{ queries: built\.map\(\(\{ options \}\) => options\) \}\);/);
   assert.match(hook, /queryKey: \['tool-result', conversationId, ref\?\.messageId\] as const,/);
 });
@@ -258,7 +258,9 @@ test('a quiz being made counts as maybe made, so an earlier refusal waits for it
 test('the job is asked every 4 s until it is done, failed or gone, and not while the tab is hidden', () => {
   const hook = readFileSync(join(here, 'use-quiz-job.ts'), 'utf8');
   assert.match(hook, /export const QUIZ_JOB_POLL_MS = 4_000;/);
-  assert.match(hook, /apiClient\.get<\{ data\?: \{ job\?: unknown \} \}>\(`\/quiz-jobs\/\$\{encodeURIComponent\(uuid\)\}`\)/);
+  // The owner's route in OWNER_HELD_ITEMS; the admin view reads its own (held-items-source.ts, Backend cd4eaeef).
+  assert.match(hook, /queryFn: \(\) => source\.quizJob\(uuid\),/);
+  assert.match(readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'held-items-source.ts'), 'utf8'), /apiClient\.get<\{ data\?: \{ job\?: unknown \} \}>\(`\/quiz-jobs\/\$\{encodeURIComponent\(uuid\)\}`\)/);
   assert.match(hook, /quizJobFinished\(query\.state\.data\) \|\| statusOf\(query\.state\.error\) === 404 \? false : QUIZ_JOB_POLL_MS/);
   assert.match(hook, /refetchIntervalInBackground: false,/);
   const card = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');

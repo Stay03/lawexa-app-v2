@@ -123,7 +123,7 @@ export function MachineWaitEndedNote() {
         <Clock aria-hidden className="size-3.5" />
         Waited 30 minutes
       </span>
-      {panel ? (
+      {panel?.shows('machine') ? (
         <button
           type="button"
           onClick={() => panel.open({ kind: 'machine' })}

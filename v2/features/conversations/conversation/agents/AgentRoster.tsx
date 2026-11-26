@@ -60,7 +60,7 @@ export function AgentRoster({ messageId, askedBy = 'Lawexa' }: { messageId: numb
 
 function AgentRosterRow({ row, onTurnEnd }: { row: AgentRow; onTurnEnd: () => void }) {
   const panel = useSidePanel();
-  const open = panel ? () => panel.open({ kind: 'agent', id: row.conversationId }) : null;
+  const open = panel?.shows('agent') ? () => panel.open({ kind: 'agent', id: row.conversationId }) : null;
   return (
     <li className="flex gap-3">
       <AgentFace initials={agentInitials(row.name)} state={row.state} />

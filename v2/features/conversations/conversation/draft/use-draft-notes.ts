@@ -6,6 +6,7 @@ import type { DraftNotesEnvelope } from '@/v2/features/notes/types';
 
 import { useV2Session } from '@/v2/runtime/session-context';
 import { notesQueries } from '@/v2/features/notes/queries';
+import { useDraftNotesSource } from './draft-notes-source';
 import {
   CATCH_UP_LIMIT_MS,
   catchUpClockStart,
@@ -34,6 +35,8 @@ import {
  */
 export function useDraftNoteState(conversationId: string, place: DraftPlace, answerDone: boolean) {
   const { userId: viewerId } = useV2Session();
+  // The owner's routes, or the admin view's read of the same list (draft-notes-source.tsx).
+  const source = useDraftNotesSource();
   // When this panel first saw the note behind, or `null`. Set during render
   // (the house's "adjust state during render" pattern), never in an effect.
   const [waitingSince, setWaitingSince] = useState<number | null>(null);
@@ -43,10 +46,11 @@ export function useDraftNoteState(conversationId: string, place: DraftPlace, ans
   const [lastReadWhileWriting, setLastReadWhileWriting] = useState<number | null>(null);
 
   const query = useQuery({
-    ...notesQueries.draftNotes({ conversationId, viewerId }),
+    ...source.draftNotes({ conversationId, viewerId }),
     refetchInterval: (current) => {
       const data = current.state.data?.data;
-      if (!data) return false;
+      // The admin view's read moves no note forward (Backend 7b74631e): nothing to wait for.
+      if (!data || source.readOnly) return false;
       const state = draftNoteState({ status: 'success', notes: data.notes, documents: data.documents }, place);
       return catchUpPoll(state, waitingSince === null ? 0 : Date.now() - waitingSince, answerDone);
     },
@@ -94,8 +98,9 @@ export function useDraftNoteState(conversationId: string, place: DraftPlace, ans
  */
 export function useDraftEdited(conversationId: string | undefined, key: string, enabled: boolean): boolean {
   const { userId: viewerId } = useV2Session();
+  const source = useDraftNotesSource();
   const query = useQuery({
-    ...notesQueries.draftNotes({ conversationId: conversationId ?? '', viewerId }),
+    ...source.draftNotes({ conversationId: conversationId ?? '', viewerId }),
     enabled: enabled && Boolean(conversationId),
   });
   // A disabled query still reads the chat's cached list: an older version's card never says Edited.

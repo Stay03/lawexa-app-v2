@@ -268,8 +268,11 @@ export interface DraftNoteDocument {
  *   moved    the chat moved in or out of a Space since the note was made;
  *            the note stays where it was and takes no new versions.
  *   hidden   the note is one this reader may not see.
+ *   not_made_yet  the owner's next open of the list makes it. Only the admin
+ *            read says so (Backend 7b74631e): the owner's own read makes the
+ *            note on the spot, so the owner never sees it.
  */
-export type DraftNoteMissing = 'deleted' | 'limit' | 'moved' | 'hidden';
+export type DraftNoteMissing = 'deleted' | 'limit' | 'moved' | 'hidden' | 'not_made_yet';
 
 export interface DraftNotesEnvelope {
   success: boolean;

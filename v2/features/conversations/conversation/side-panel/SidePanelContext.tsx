@@ -75,7 +75,17 @@ const NO_TITLES: DraftTitleLookup = () => null;
 export type DraftKeysLookup = (messageId: string | null, drafts: readonly KeyedDraft[]) => string[];
 
 
+/** A kind of thing the panel can hold (`?side=` draft, file, note, machine, agent). */
+export type SidePanelKind = SidePanelTarget['kind'];
+
 export interface SidePanelApi extends SidePanelUrlState {
+  /**
+   * Whether this page's panel shows `kind`: every kind on a chat's page; the
+   * admin view's read-only panel shows only what staff may read (drafts,
+   * files, agents; never the owner's live machine). A button that opens the
+   * panel asks first, so nothing opens a panel the page does not draw.
+   */
+  shows: (kind: SidePanelKind) => boolean;
   /** How many drafts come before an answer's own (0 for an answer not in the map). */
   draftOffset: (messageId: string) => number;
   /** Draft `ordinal`'s place among its versions; `null` where the chat keeps no versions (a Radar report). */
@@ -171,6 +181,7 @@ export function SidePanelValueProvider({
   keys,
   space,
   frame,
+  kinds,
   children,
 }: {
   url: SidePanelUrlState;
@@ -183,12 +194,15 @@ export function SidePanelValueProvider({
   keys?: DraftKeysLookup;
   space: ConversationSpaceRef | null;
   frame: SidePanelFrame;
+  /** The kinds this page's panel shows; every kind when absent. */
+  kinds?: ReadonlySet<SidePanelKind>;
   children: ReactNode;
 }) {
+  const shows = useCallback((kind: SidePanelKind) => (kinds ? kinds.has(kind) : true), [kinds]);
   const draftOffset = useCallback((messageId: string) => offsets.get(messageId) ?? 0, [offsets]);
   const api = useMemo<SidePanelApi>(
-    () => ({ ...url, draftOffset, draftVersion: versions ?? NO_VERSIONS, draftTitle: titles ?? NO_TITLES, draftKeys: keys ?? null, space, frame }),
-    [url, draftOffset, versions, titles, keys, space, frame],
+    () => ({ ...url, shows, draftOffset, draftVersion: versions ?? NO_VERSIONS, draftTitle: titles ?? NO_TITLES, draftKeys: keys ?? null, space, frame }),
+    [url, shows, draftOffset, versions, titles, keys, space, frame],
   );
   return <SidePanelContext.Provider value={api}>{children}</SidePanelContext.Provider>;
 }

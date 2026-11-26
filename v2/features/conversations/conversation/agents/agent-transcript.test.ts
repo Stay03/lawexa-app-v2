@@ -192,7 +192,8 @@ test("a call made from the turn a wake starts gets its rows too, at the end of t
 test("the panel draws its own sub-agents with the chat's roster, named for the agent, and their return with Open", () => {
   const dir = join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'agents');
   const source = readFileSync(join(dir, 'AgentConversationPanel.tsx'), 'utf8');
-  assert.match(source, /agentConversationQueries\.of\(\{ parentId: conversationId, viewerId \}\)/);
+  // Read through the panel's source: the owner's routes, or the admin view's snapshot (agent-panel-source.ts).
+  assert.match(source, /source\.agents\(\{ parentId: conversationId, viewerId \}\)/);
   assert.match(source, /places\.has\(index\) \? <AgentRoster messageId=\{places\.get\(index\) \?\? null\} askedBy=\{agentName \?\? 'This agent'\} \/>/);
   assert.match(source, /subAgentReplyView\(row, useRosterReplyIds\(\)\)[\s\S]*?panel\.open\(\{ kind: 'agent', id: view\.openId \}\)[\s\S]*?Open its conversation/);
   const roster = readFileSync(join(dir, 'AgentRoster.tsx'), 'utf8');

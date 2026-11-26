@@ -28,7 +28,8 @@ export function OpenMachineButton({ handOver = false }: { handOver?: boolean }) 
   const session = useV2Session();
   const params = useParams<{ conversationId?: string }>();
   const box = useQuery({ ...userBoxQueries.status({ viewerId: session.userId }), enabled: handOver }).data ?? null;
-  if (!panel || (panel.target?.kind === 'machine' && !panel.closing)) return null;
+  // Only where the page's panel shows the machine (never the admin view's read-only panel).
+  if (!panel?.shows('machine') || (panel.target?.kind === 'machine' && !panel.closing)) return null;
   const open = () => panel.open({ kind: 'machine' });
   // "Press Done" only while Lawexa waits for Done in this chat; once the hand-over has moved on,
   // the step header and the wait-ended note already open the machine. Until the status arrives,

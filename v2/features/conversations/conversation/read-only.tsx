@@ -50,3 +50,12 @@ export function useCanAct(): boolean {
 export function useCanActForSelf(): boolean {
   return !useContext(ReadOnlyTranscriptContext);
 }
+
+/**
+ * Is the transcript drawn for someone who is not its reader (the admin view)?
+ * For words, not controls: a row that says "your Files" says "the owner's
+ * Files" there, and links to nothing of the staff member's own.
+ */
+export function useDrawnForSomeoneElse(): boolean {
+  return useContext(ReadOnlyTranscriptContext);
+}

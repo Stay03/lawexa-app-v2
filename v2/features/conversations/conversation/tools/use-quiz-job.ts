@@ -2,9 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { apiClient } from '@/lib/api/client';
 import { statusOf } from '@/v2/runtime/persist/policy';
 import { quizJobFinished } from './created-quiz';
+import { useHeldItemsSource } from '../held-items-source';
 
 /** How often a quiz still being made is asked about: every 4 s. */
 export const QUIZ_JOB_POLL_MS = 4_000;
@@ -20,12 +20,11 @@ export const QUIZ_JOB_POLL_MS = 4_000;
  * reopened chat's stored job asks once and a finished job answers at once.
  */
 export function useQuizJob(uuid: string) {
+  // The owner's route, or the admin view's read of a job its chat holds (held-items-source.ts).
+  const source = useHeldItemsSource();
   return useQuery({
     queryKey: ['quiz-job', uuid] as const,
-    queryFn: async () => {
-      const response = await apiClient.get<{ data?: { job?: unknown } }>(`/quiz-jobs/${encodeURIComponent(uuid)}`);
-      return response.data?.data?.job ?? null;
-    },
+    queryFn: () => source.quizJob(uuid),
     refetchInterval: (query) =>
       quizJobFinished(query.state.data) || statusOf(query.state.error) === 404 ? false : QUIZ_JOB_POLL_MS,
     refetchIntervalInBackground: false,

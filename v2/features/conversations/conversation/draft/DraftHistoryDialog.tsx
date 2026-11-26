@@ -30,6 +30,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { useV2ChatContext } from '../chat-context';
 import { diffDocs, hasChanges } from './draft-diff';
 import { revisionAuthorLabel } from './draft-note-state';
+import { useDraftNotesSource } from './draft-notes-source';
 import { ADDED_WORDS, DiffDocument, REMOVED_WORDS } from './DraftChangesView';
 
 /**
@@ -74,14 +75,20 @@ export function DraftHistoryDialog({
   /** Where it opens: the draft panel, or the note's own page. */
   of?: 'draft' | 'note';
 }) {
-  const words = HISTORY_WORDS[of];
-  const { userUuid } = useV2Session();
+  // Staff in the admin view read the owner's history: the owner by name (the view is drawn as the owner, so "You"
+  // would name the staff member), and words with no restore.
+  const staff = useDraftNotesSource().readOnly;
+  const words = staff ? STAFF_HISTORY_WORDS : HISTORY_WORDS[of];
+  const sessionUuid = useV2Session().userUuid;
+  const userUuid = staff ? null : sessionUuid;
   const queryClient = useQueryClient();
   const chat = useV2ChatContext();
   const [page, setPage] = useState(1);
   const [chosen, setChosen] = useState<NoteRevision | null>(null);
   const [asking, setAsking] = useState(false);
-  const list = useQuery({ ...notesQueries.revisions({ id: noteId, page }), enabled: open });
+  // The owner's routes, or the admin view's read of the same history (draft-notes-source.tsx).
+  const source = useDraftNotesSource();
+  const list = useQuery({ ...source.revisions({ id: noteId, page }), enabled: open });
 
   const restore = useMutation({
     mutationFn: (revision: number) => notesApi.restoreRevision(noteId, revision),
@@ -185,7 +192,7 @@ export function DraftHistoryDialog({
         </div>
         {/* Any version restores, the newest too: once the reader has edited it,
             Lawexa's newest version is not the text now (Frontend's review). */}
-        {chosen && canRestore ? (
+        {chosen && canRestore && !source.readOnly ? (
           <div className="flex flex-wrap items-center justify-end gap-3">
             {saving ? <span className="text-xs text-muted-foreground">Saving your last edits first…</span> : null}
             <Button type="button" onClick={() => setAsking(true)} disabled={saving || restore.isPending}>
@@ -230,6 +237,15 @@ export function DraftHistoryDialog({
 }
 
 /** The dialog's words, for a draft in the panel and for a note on its own page. */
+/** The admin view's history: the owner's, read only (nothing here restores). */
+const STAFF_HISTORY_WORDS = {
+  description: 'Every version Lawexa wrote, and the owner’s text from just before each new one. Read only here.',
+  choose: 'Choose a version to see it against the draft as it is now.',
+  same: 'The same as the draft now.',
+  becomes: 'becomes the draft’s text.',
+  kept: 'The draft as it is now stays in the history.',
+} as const;
+
 const HISTORY_WORDS = {
   draft: {
     description: 'Every version Lawexa wrote, and your text from just before each new one. Restoring one keeps the rest.',
@@ -273,7 +289,8 @@ function RevisionAgainstNow({
 }) {
   const queryClient = useQueryClient();
   const { userId: viewerId } = useV2Session();
-  const one = useQuery(notesQueries.revision({ id: noteId, revision: revision.revision }));
+  const source = useDraftNotesSource();
+  const one = useQuery(source.revision({ id: noteId, revision: revision.revision }));
   // The note editor's own schema, so both texts read as the editor reads them.
   const [extensions] = useState(() =>
     createNoteExtensions({ placeholder: '', mentionStore: createCaseMentionStore({ queryClient, viewerId }) }),

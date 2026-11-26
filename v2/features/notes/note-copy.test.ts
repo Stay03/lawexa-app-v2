@@ -88,6 +88,6 @@ test('the note page wires its version history to the draft panel’s dialog', ()
   // No button for anyone else.
   assert.match(read('reader', 'NoteActions.tsx'), /\{onHistory \? \(\s*<button type="button" onClick=\{onHistory\}/);
   const dialog = read('..', 'conversations', 'conversation', 'draft', 'DraftHistoryDialog.tsx');
-  assert.match(dialog, /const words = HISTORY_WORDS\[of\];/);
+  assert.match(dialog, /const words = staff \? STAFF_HISTORY_WORDS : HISTORY_WORDS\[of\];/);
   assert.match(dialog, /becomes: 'becomes the note’s text\.'/);
 });

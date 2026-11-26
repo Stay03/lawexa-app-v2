@@ -25,7 +25,8 @@ test('the API is woz’s: the list, the revisions, one revision, restore, and My
   assert.doesNotMatch(api, /by-draft/);
   const types = read('v2', 'features', 'notes', 'types.ts');
   assert.match(types, /note_missing: DraftNoteMissing \| null;/);
-  assert.match(types, /export type DraftNoteMissing = 'deleted' \| 'limit' \| 'moved' \| 'hidden';/);
+  // not_made_yet: only the admin read says it (Backend 7b74631e); the owner's list makes the note as it reads.
+  assert.match(types, /export type DraftNoteMissing = 'deleted' \| 'limit' \| 'moved' \| 'hidden' \| 'not_made_yet';/);
   assert.match(types, /data: \{ note: NoteRecord; revision: number \};/);
 });
 
@@ -56,7 +57,8 @@ test('the panel finds its document by the draft’s group and knows the newest v
   assert.match(report, /latestOrdinal=\{target\.ordinal\}\s*answerDone\s*\/>/);
   // An older version offers the latest; a list not reached, or a note slow to catch up, Try again.
   assert.match(editor, /state\.kind === 'older'\s*\?\s*\{ label: 'Open latest', onPress: \(\) => panel\?\.open\(\{ kind: 'draft', ordinal: state\.latestOrdinal \}\) \}/);
-  assert.match(editor, /state\.kind === 'unlisted' \|\| \(state\.kind === 'catching-up' && waitedMs >= CATCH_UP_LIMIT_MS\)\s*\?\s*\{ label: 'Try again', onPress: retry \}/);
+  // Staff in the admin view read a snapshot that moves no note forward: no catching-up Try again for them.
+  assert.match(editor, /state\.kind === 'unlisted' \|\| \(!staff && state\.kind === 'catching-up' && waitedMs >= CATCH_UP_LIMIT_MS\)\s*\?\s*\{ label: 'Try again', onPress: retry \}/);
 });
 
 test('each state opens the right editor: the note, the page’s memory, or Lawexa’s text read only', () => {
@@ -94,7 +96,7 @@ test('an open draft registers its save with the send while it edits the note, an
   // (a passive effect), never in the render (a render React discards must mark nothing).
   assert.match(editor, /useLayoutEffect\(\(\) => \{\s*if \(editedNote === null\) return;\s*if \(editing\) clearDraftSuperseded\(conversationId, ordinal, editedNote\);\s*else markDraftSuperseded\(conversationId, ordinal, editedNote\);\s*\}, \[conversationId, ordinal, editedNote, editing\]\);/);
   // The history needs edit rights on the server: offered to an editor only.
-  assert.match(editor, /onHistory: savesToNote \? \(\) => setHistoryOpen\(true\) : null/);
+  assert.match(editor, /const onHistory = savesToNote \|\| \(staff && record\) \? \(\) => setHistoryOpen\(true\) : null;/);
   const bar = read(...DRAFT, 'DraftSaveBar.tsx');
   assert.match(bar, /\{onHistory \? \(\s*<DropdownMenuItem onSelect=\{onHistory\}>/);
   const hook = read('v2', 'features', 'notes', 'editor', 'use-autosave.ts');
@@ -115,7 +117,8 @@ test('the version history: newest first, who and when, the chosen one against no
   assert.match(dialog, /diffDocs\(generateJSON\(now, extensions\), generateJSON\(then, extensions\)\)/);
   // Restore: any version, Lawexa's newest too (the reader may have edited it), only for an editor,
   // only once the draft's own edits are saved, and after a question.
-  assert.match(dialog, /\{chosen && canRestore \? \(/);
+  // Never a restore in the admin view (a read-only source), whatever the note's can_edit says.
+  assert.match(dialog, /\{chosen && canRestore && !source\.readOnly \? \(/);
   assert.doesNotMatch(dialog, /!== newest|const newest/);
   assert.match(dialog, /disabled=\{saving \|\| restore\.isPending\}/);
   assert.match(dialog, /<AlertDialogTitle>Restore this version\?<\/AlertDialogTitle>/);
@@ -129,7 +132,9 @@ test('the version history: newest first, who and when, the chosen one against no
 
 test('the newest version’s card says Edited once the reader changed it', () => {
   const card = read(...DRAFT, 'DraftCard.tsx');
-  assert.match(card, /useDraftEdited\(chat\?\.conversationId, key, Boolean\(panel\) && draft\.complete && !older\)/);
+  // The chat's id from its chat context, or from the admin view's source (it has no chat context).
+  assert.match(card, /const conversationId = chat\?\.conversationId \?\? source\.conversationId \?\? undefined;/);
+  assert.match(card, /useDraftEdited\(conversationId, key, Boolean\(panel\) && draft\.complete && !older\)/);
   assert.match(card, /\{edited \? ' · Edited' : null\}/);
   // The list is shared by the chat's cards: a card that does not ask never reads another's answer.
   const hook = read(...DRAFT, 'use-draft-notes.ts');

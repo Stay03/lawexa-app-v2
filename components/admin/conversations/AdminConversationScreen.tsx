@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import {
   adminKeys,
   useAdminConversation,
@@ -40,6 +41,11 @@ import { AdminRawMessages } from './AdminRawMessages';
  * the transcript keeps no scroll box of its own and opens at the chat's first
  * message. "Jump to latest" goes to its end.
  *
+ * THE SIDE PANEL. A draft or a file opens beside the chat, read only, as on
+ * the owner's page (Stay, 26 November 2026: "like for like as user side").
+ * On a computer the page keeps a box for it beside the column, which moves
+ * to the left while it is open; below xl the panel is the owner's sheet.
+ *
  * A SNAPSHOT. Read when the page opens and on Refresh; nothing streams and
  * nothing can be sent. A confidential chat shows the header and "nothing
  * kept"; a redacted chat shows the redacted text, as its owner sees it.
@@ -53,6 +59,9 @@ export function AdminConversationScreen({ id }: { id: string }) {
   const jobs = useAdminConversationJobs(id, view !== null && !confidential);
   const [mode, setMode] = useState<'chat' | 'raw'>('chat');
   const endRef = useRef<HTMLDivElement>(null);
+  // The side panel's box beside the column, and whether the panel is open (the transcript says).
+  const [panelHost, setPanelHost] = useState<HTMLDivElement | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const { setOverride, clearOverride } = useBreadcrumbStore();
   const title = view?.title ?? null;
@@ -105,53 +114,68 @@ export function AdminConversationScreen({ id }: { id: string }) {
   }
 
   const hasMessages = view.messages.length > 0;
+  const panelShown = panelOpen && mode === 'chat';
   return (
-    <div className={`${COLUMN} flex flex-col gap-5`}>
-      <BackLink />
-      <ChatHeader
-        view={view}
-        readAt={chat.dataUpdatedAt}
-        refreshing={refreshing}
-        onRefresh={refresh}
-        agents={agents.data ?? []}
-      />
+    <div className={cn(panelShown && 'xl:flex xl:items-start xl:gap-6')}>
+      <div className={cn(COLUMN, 'flex flex-col gap-5', panelShown && 'xl:mx-0 xl:min-w-0 xl:flex-1')}>
+        <BackLink />
+        <ChatHeader
+          view={view}
+          readAt={chat.dataUpdatedAt}
+          refreshing={refreshing}
+          onRefresh={refresh}
+          agents={agents.data ?? []}
+        />
 
-      {confidential ? (
-        <div className="flex flex-col items-center rounded-lg border px-6 py-12 text-center">
-          <ShieldCheck aria-hidden className="mb-3 size-6 text-emerald-600 dark:text-emerald-500" />
-          <p className="font-medium">Confidential: nothing kept</p>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            A confidential chat lives only on the device that made it. The server keeps none of its messages.
-          </p>
-        </div>
-      ) : (
-        <section aria-label="The chat" className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Tabs value={mode} onValueChange={(value) => setMode(value === 'raw' ? 'raw' : 'chat')}>
-              <TabsList>
-                <TabsTrigger value="chat">As the owner sees it</TabsTrigger>
-                <TabsTrigger value="raw">Raw</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            {hasMessages && (
-              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={jumpToLatest}>
-                <ArrowDown aria-hidden />
-                Jump to latest
-              </Button>
-            )}
+        {confidential ? (
+          <div className="flex flex-col items-center rounded-lg border px-6 py-12 text-center">
+            <ShieldCheck aria-hidden className="mb-3 size-6 text-emerald-600 dark:text-emerald-500" />
+            <p className="font-medium">Confidential: nothing kept</p>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              A confidential chat lives only on the device that made it. The server keeps none of its messages.
+            </p>
           </div>
-          {!hasMessages ? (
-            <div className="rounded-lg border px-6 py-10 text-center text-sm text-muted-foreground">
-              No messages in this chat.
+        ) : (
+          <section aria-label="The chat" className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Tabs value={mode} onValueChange={(value) => setMode(value === 'raw' ? 'raw' : 'chat')}>
+                <TabsList>
+                  <TabsTrigger value="chat">As the owner sees it</TabsTrigger>
+                  <TabsTrigger value="raw">Raw</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {hasMessages && (
+                <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={jumpToLatest}>
+                  <ArrowDown aria-hidden />
+                  Jump to latest
+                </Button>
+              )}
             </div>
-          ) : mode === 'raw' ? (
-            <AdminRawMessages conversationId={view.id} messages={view.messages} />
-          ) : (
-            <OwnerTranscript view={view} agents={agents.data ?? []} jobs={jobs.data ?? []} />
-          )}
-          <div ref={endRef} aria-hidden />
-        </section>
-      )}
+            {!hasMessages ? (
+              <div className="rounded-lg border px-6 py-10 text-center text-sm text-muted-foreground">
+                No messages in this chat.
+              </div>
+            ) : mode === 'raw' ? (
+              <AdminRawMessages conversationId={view.id} messages={view.messages} />
+            ) : (
+              <OwnerTranscript
+                view={view}
+                agents={agents.data ?? []}
+                jobs={jobs.data ?? []}
+                panelHost={panelHost}
+                onPanelOpenChange={setPanelOpen}
+              />
+            )}
+            <div ref={endRef} aria-hidden />
+          </section>
+        )}
+      </div>
+      {/* The side panel's box: beside the column on a computer, as tall as the page's scroll (AdminSidePanel). */}
+      <div
+        ref={setPanelHost}
+        data-admin-side-panel-host=""
+        className={cn(panelShown && 'xl:sticky xl:top-0 xl:h-[var(--admin-side-panel-h,100dvh)] xl:w-[min(50%,52rem)] xl:shrink-0 xl:py-3')}
+      />
     </div>
   );
 }
@@ -176,10 +200,14 @@ function OwnerTranscript({
   view,
   agents,
   jobs,
+  panelHost,
+  onPanelOpenChange,
 }: {
   view: AdminConversationView;
   agents: readonly AgentConversation[];
   jobs: NonNullable<ReturnType<typeof useAdminConversationJobs>['data']>;
+  panelHost: HTMLElement | null;
+  onPanelOpenChange: (open: boolean) => void;
 }) {
   const showNGN = useCurrencyStore((s) => s.showNGN);
   const { rate: exchangeRate } = useExchangeRate();
@@ -191,7 +219,16 @@ function OwnerTranscript({
     },
     [facts, showNGN, exchangeRate],
   );
-  return <AdminTranscript view={view} agentConversations={agents} jobs={jobs} turnFooter={turnFooter} />;
+  return (
+    <AdminTranscript
+      view={view}
+      agentConversations={agents}
+      jobs={jobs}
+      turnFooter={turnFooter}
+      panelHost={panelHost}
+      onPanelOpenChange={onPanelOpenChange}
+    />
+  );
 }
 
 /** Staff only, under an answer: what its turn cost, which model wrote it, what paid. Quiet, so the answer leads. */

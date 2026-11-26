@@ -10,6 +10,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useToolResult } from '../tools/use-tool-result';
 import { FileMark } from './FileMark';
 import { chatRecording } from './chat-recording';
+import { useDrawnForSomeoneElse } from '../read-only';
 
 /**
  * RecordingCard — a call Lawexa recorded on its machine, after the step chain
@@ -27,6 +28,8 @@ import { chatRecording } from './chat-recording';
 export function RecordingCard({ message }: { message: ToolMessage }) {
   const loaded = useToolResult(message, message.toolStatus === 'complete');
   const recording = chatRecording(loaded.message);
+  // Staff in the admin view read the owner's recording: "the owner's Files", never a link to their own.
+  const forSomeoneElse = useDrawnForSomeoneElse();
 
   if (loaded.status === 'loading') {
     return (
@@ -48,22 +51,29 @@ export function RecordingCard({ message }: { message: ToolMessage }) {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm leading-snug font-semibold text-foreground">{recording.name}</span>
           <span className="mt-0.5 block truncate text-xs text-muted-foreground tabular-nums">
-            {['Recording', recording.length, 'in your Files'].filter(Boolean).join(' · ')}
+            {['Recording', recording.length, forSomeoneElse ? 'in the owner’s Files' : 'in your Files'].filter(Boolean).join(' · ')}
           </span>
         </span>
       </div>
       <MediaPlayer
         file={{ id: recording.fileId, original_name: recording.name }}
         kind="audio"
-        failure={<RecordingFailure />}
+        failure={<RecordingFailure forSomeoneElse={forSomeoneElse} />}
         className="mt-3"
       />
     </section>
   );
 }
 
-/** Where the recording is, when it will not play here: the reader's Files. */
-function RecordingFailure() {
+/** Where the recording is, when it will not play here: the reader's Files (the owner's, in the admin view). */
+function RecordingFailure({ forSomeoneElse }: { forSomeoneElse: boolean }) {
+  if (forSomeoneElse) {
+    return (
+      <p role="status" className="mt-3 text-[13px] text-muted-foreground">
+        This recording didn&rsquo;t play here. It&rsquo;s saved in the owner&rsquo;s Files.
+      </p>
+    );
+  }
   return (
     <p role="status" className="mt-3 text-[13px] text-muted-foreground">
       This recording didn&rsquo;t play here. It&rsquo;s saved in{' '}

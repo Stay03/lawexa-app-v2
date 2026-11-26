@@ -248,7 +248,7 @@ test('the note menu lists, in order: what saving does, Open note, Export Word an
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
   const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('export function DraftSaveBar'));
   // Where there is a note, its menu; where there is none, the downloads.
-  assert.match(control, /\{note \? \(\s*<NoteMenu[\s\S]*?\) : \(\s*<DownloadMenu downloads=\{tools\.downloads\} \/>\s*\)\}/);
+  assert.match(control, /\{note \? \(\s*<NoteMenu[\s\S]*?\) : \(\s*<DownloadMenu downloads=\{tools\.downloads\} onHistory=\{onHistory\} \/>\s*\)\}/);
   const menu = bar.slice(bar.indexOf('function NoteMenu'), bar.indexOf('export function DraftFolderPicker'));
   const order = ['In your notes', 'Open note', 'Export Word', '.docx', 'Export PDF', '.pdf', 'Version history', '{folder}'];
   let at = -1;

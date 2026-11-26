@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { skillDraftErrorSentence, skillDraftKindLine, skillDraftStatusLine } from '@/lib/utils/skill-draft';
 import { skillDraftsApi } from '@/lib/api/skill-drafts';
+import { useHeldItemsSource } from '../held-items-source';
 import { mySkillsApi } from '@/lib/api/private-items';
 import type { SkillDraft, SkillDraftCard, SkillDraftStatus } from '@/types/skill-draft';
 import { privateItemsQueries } from '@/v2/features/private-items/queries';
@@ -45,9 +46,11 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
 
+  // The owner's route, or the admin view's read of a draft its chat proposed (held-items-source.ts).
+  const held = useHeldItemsSource();
   const draft = useQuery({
     queryKey: ['skill-draft', card.draft],
-    queryFn: () => skillDraftsApi.get(card.draft),
+    queryFn: () => held.skillDraft(card.draft),
     enabled: open,
     retry: (count, error) => extractApiError(error).status >= 500 && count < 2,
     staleTime: 30_000,

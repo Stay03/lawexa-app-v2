@@ -65,7 +65,8 @@ test('an agent conversation opens in the chat’s side panel by its uuid', () =>
 
   const read = (...parts: string[]) => readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', ...parts), 'utf8');
   // Each agent's row opens its conversation ("Read the reply", "Open its conversation").
-  assert.match(read('agents', 'AgentRoster.tsx'), /const open = panel \? \(\) => panel\.open\(\{ kind: 'agent', id: row\.conversationId \}\) : null;/);
+  // Only where the page's panel shows agents (every chat page, and the admin view's read-only panel).
+  assert.match(read('agents', 'AgentRoster.tsx'), /const open = panel\?\.shows\('agent'\) \? \(\) => panel\.open\(\{ kind: 'agent', id: row\.conversationId \}\) : null;/);
 });
 
 // Review finding 1 (12 November 2026): in a Space, the root chat's owner and
