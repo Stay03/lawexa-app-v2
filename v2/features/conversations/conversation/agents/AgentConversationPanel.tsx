@@ -27,6 +27,10 @@ import { AgentRowsProvider, useRosterReplyIds } from './context';
 import { agentConversationQueries } from './queries';
 import { useAgentStream } from './use-agent-stream';
 import { sendsOnEnter } from '@/lib/utils/enter-key';
+import { DictateButton } from '@/v2/features/dictation/DictateButton';
+import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
+import { dictationProblemLine, joinText } from '@/v2/features/dictation/dictation-model';
+import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
 
 /**
  * AgentConversationPanel — an agent conversation beside the chat (sub-agents
@@ -275,6 +279,24 @@ function AgentComposer({ conversation, running, onSent }: { conversation: AgentC
     send.mutate(message);
   };
 
+  // Dictation (Arthur, 26 November 2026: every message box has it). The agent's route takes words only, so no voice is kept.
+  // The words go into the box first: a refusal (still answering, 409) leaves them there, as the box says.
+  const { canDictate } = useV2Session();
+  const { state: dictating, dictation } = useDictation({
+    onSend: ({ text: words }) => {
+      if (running || send.isPending) {
+        setText((current) => joinText(current, words));
+        return;
+      }
+      setText(words);
+      send.mutate(words);
+    },
+    onProblem: (kind, message) => setProblem(dictationProblemLine(kind, message)),
+  });
+  const dictationOpen = isDictating(dictating);
+  // Dictate holds Send's place while the box is empty and no turn runs.
+  const offerDictate = canDictate && !dictationOpen && !running && text.trim() === '';
+
   // The app's one Enter rule (lib/utils/enter-key.ts): on a phone, return adds a line and the send button sends.
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (sendsOnEnter(event)) submit();
@@ -289,44 +311,54 @@ function AgentComposer({ conversation, running, onSent }: { conversation: AgentC
 
   return (
     <form onSubmit={submit} className="flex w-full flex-col gap-1.5">
-      <div className="flex w-full items-end gap-2">
-        <Textarea
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={onKeyDown}
-          rows={1}
-          maxLength={30000}
-          placeholder={running ? `${conversation.agent.name} is answering…` : `Write to ${conversation.agent.name}`}
-          aria-label={`Write to ${conversation.agent.name}`}
-          className="max-h-40 min-h-10 flex-1 resize-none rounded-2xl"
-        />
-        {running ? (
-          <button
-            type="button"
-            onClick={stop}
-            disabled={stopping === running}
-            aria-label={`Stop ${conversation.agent.name}`}
-            className={cn(
-              'v2-interactive flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity disabled:opacity-60',
-              FOCUS_RING,
-            )}
-          >
-            {stopping === running ? <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" /> : <Square aria-hidden className="size-3.5 fill-current" />}
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={!text.trim() || send.isPending}
-            aria-label="Send"
-            className={cn(
-              'v2-interactive flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-50',
-              FOCUS_RING,
-            )}
-          >
-            {send.isPending ? <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" /> : <ArrowUp aria-hidden className="size-4" />}
-          </button>
-        )}
-      </div>
+      <DictationCountdown state={dictating} dictation={dictation} />
+      {dictationOpen ? (
+        <div className="w-full rounded-2xl border px-1 py-1">
+          <DictationPanel state={dictating} dictation={dictation} canSend={!running} isSending={send.isPending} />
+        </div>
+      ) : (
+        <div className="flex w-full items-end gap-2">
+          <Textarea
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={onKeyDown}
+            rows={1}
+            maxLength={30000}
+            placeholder={running ? `${conversation.agent.name} is answering…` : `Write to ${conversation.agent.name}`}
+            aria-label={`Write to ${conversation.agent.name}`}
+            className="max-h-[min(10rem,30dvh)] min-h-10 flex-1 resize-none rounded-2xl"
+          />
+          {running ? (
+            <button
+              type="button"
+              onClick={stop}
+              disabled={stopping === running}
+              aria-label={`Stop ${conversation.agent.name}`}
+              className={cn(
+                'v2-interactive flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity disabled:opacity-60',
+                FOCUS_RING,
+              )}
+            >
+              {stopping === running ? <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" /> : <Square aria-hidden className="size-3.5 fill-current" />}
+            </button>
+          ) : offerDictate ? (
+            <DictateButton onStart={() => void dictation.start()} disabled={send.isPending} className="size-10" />
+          ) : (
+            <button
+              type="submit"
+              disabled={!text.trim() || send.isPending}
+              aria-label="Send"
+              className={cn(
+                'v2-interactive flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-50',
+                FOCUS_RING,
+              )}
+            >
+              {send.isPending ? <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" /> : <ArrowUp aria-hidden className="size-4" />}
+            </button>
+          )}
+        </div>
+      )}
+      {dictationOpen ? <DictationHint state={dictating} /> : null}
       <p role="status" aria-live="polite" className="min-h-4 px-1 text-xs text-muted-foreground">
         {problem ?? ''}
       </p>
