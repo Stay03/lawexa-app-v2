@@ -7,8 +7,10 @@ import { join, relative, sep } from 'node:path';
  * One rule for every control in the chat's rows and cards that writes (card
  * e4b12be8, thread 085a980c, 26 November 2026): it asks `useCanAct()`
  * (read-only.tsx), which is false in the admin view, outside a chat screen,
- * and for a reader who may not send. A row that writes without asking fails
- * here.
+ * and for a reader who may not send. A control that writes to the reader's
+ * OWN account instead ("Save as my template") asks the narrower
+ * `useCanActForSelf()`, false only in the admin view (Techlead, 26 November
+ * 2026). A row that writes without asking either fails here.
  *
  * "Writes" is read from the source and errs towards writing: a mutation, a
  * mutations module, an apiClient post/put/patch/delete, a follow-up turn
@@ -63,13 +65,13 @@ function writes(source: string): string[] {
 const files = [...ROW_DIRS.flatMap((dir) => walk(join(CONVERSATION, dir))), ...EXTRA];
 const key = (file: string) => relative(CONVERSATION, file).split(sep).join('/');
 
-test('every row or card file that writes asks useCanAct()', () => {
+test('every row or card file that writes asks useCanAct() or useCanActForSelf()', () => {
   const missing = files
     .map((file) => ({ file, found: writes(readFileSync(file, 'utf8')) }))
     .filter(({ file, found }) => found.length > 0 && !(key(file) in ASKED_ELSEWHERE))
-    .filter(({ file }) => !/\buseCanAct\(\)/.test(readFileSync(file, 'utf8')))
+    .filter(({ file }) => !/\buseCanAct(ForSelf)?\(\)/.test(readFileSync(file, 'utf8')))
     .map(({ file, found }) => `${relative(ROOT, file)} (${found.join(', ')})`);
-  assert.deepEqual(missing, [], 'these write without asking useCanAct()');
+  assert.deepEqual(missing, [], 'these write without asking useCanAct() or useCanActForSelf()');
 });
 
 test('the detector finds the writes it was built on', () => {
@@ -108,8 +110,18 @@ test('each file allowed to write without asking still has its asker', () => {
 test('the rule: false in the admin view, outside a chat, and for a reader who may not send', () => {
   const rule = readFileSync(join(CONVERSATION, 'read-only.tsx'), 'utf8');
   assert.match(rule, /return !readOnly && chat !== null && chat\.canSend;/);
+  // The own-account question: false only in the admin view.
+  assert.match(rule, /export function useCanActForSelf\(\): boolean \{\s*return !useContext\(ReadOnlyTranscriptContext\);\s*\}/);
   // One way to ask: the old read-only hook is gone, and no row reads canSend for itself.
   assert.doesNotMatch(rule, /export function useReadOnlyTranscript/);
   const leftovers = files.filter((file) => /useReadOnlyTranscript|chat(Context)?\?\.canSend === false|!chatContext\.canSend/.test(readFileSync(file, 'utf8')));
   assert.deepEqual(leftovers.map(key), []);
+});
+
+test('only own-account controls ask the narrower question: Save as my template', () => {
+  const askers = files.filter((file) => /\buseCanActForSelf\(\)/.test(readFileSync(file, 'utf8'))).map(key);
+  assert.deepEqual(askers, ['rows/SentAttachments.tsx']);
+  const attachments = readFileSync(join(CONVERSATION, 'rows', 'SentAttachments.tsx'), 'utf8');
+  assert.match(attachments, /const canActForSelf = useCanActForSelf\(\);[\s\S]{0,120}if \(!canActForSelf \|\| !chat\?\.conversationId\) return null;/);
+  assert.match(attachments, /myTemplatesApi\.fromFile\(document\.file_id, conversationId\)/);
 });

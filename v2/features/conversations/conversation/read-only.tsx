@@ -39,3 +39,14 @@ export function useCanAct(): boolean {
   const chat = useV2ChatContext();
   return !readOnly && chat !== null && chat.canSend;
 }
+
+/**
+ * The narrower question for a control that writes to the reader's OWN
+ * account, not to the chat ("Save as my template" on a sent document): a
+ * Space's Viewer or a shared-link reader keeps it. False only in a transcript
+ * drawn for someone who is not its reader (the admin view), where it would
+ * write to the staff member's account (Techlead, 26 November 2026).
+ */
+export function useCanActForSelf(): boolean {
+  return !useContext(ReadOnlyTranscriptContext);
+}
