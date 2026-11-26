@@ -71,6 +71,8 @@ test('the fold says how many replied, and every finish counts as settled', () =>
   assert.equal(foldLine([{ state: 'replied' }, { state: 'replied' }]), '2 agents replied');
   assert.equal(foldLine([{ state: 'replied' }]), '1 agent replied');
   assert.equal(foldLine([{ state: 'replied' }, { state: 'stopped' }, { state: 'failed' }]), '1 of 3 agents replied');
+  assert.equal(foldLine([{ state: 'stopped' }]), '1 agent stopped');
+  assert.equal(foldLine([{ state: 'stopped' }, { state: 'failed' }]), '0 of 2 agents replied');
   assert.deepEqual(['running', 'waiting', 'replied', 'stopped', 'failed'].map((state) => settled({ state: state as 'running' })), [false, false, true, true, true]);
 });
 
@@ -80,4 +82,6 @@ test('the clock starts at the earliest call and reads in minutes and seconds', (
   assert.equal(elapsedWords(7_400), '0:07');
   assert.equal(elapsedWords(102_000), '1:42');
   assert.equal(elapsedWords(-5), '0:00');
+  assert.equal(elapsedWords(3_725_000), '1:02:05');
+  assert.equal(elapsedWords(163_621_000), '45:27:01');
 });

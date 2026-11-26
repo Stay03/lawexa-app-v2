@@ -119,7 +119,8 @@ function LawexaLine({ rows, conversationId }: { rows: readonly ChainNode[]; conv
   return (
     <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
       <ThinkingOrb state="solving" size={20} className="shrink-0" aria-hidden />
-      <span role="status" aria-live="polite" className="text-shimmer min-w-0 truncate font-medium">
+      {/* Wraps on a phone rather than lose the queued count (fixture pictures, 26 November 2026). */}
+      <span role="status" aria-live="polite" className="text-shimmer min-w-0 font-medium text-pretty">
         {problem ?? deckLine(rows, heldIds.length)}
       </span>
       {elapsed ? <span className="shrink-0 text-xs text-muted-foreground/70 tabular-nums">· {elapsed}</span> : null}
@@ -367,13 +368,19 @@ function AgentPopover({ node, onTurnEnd, children }: { node: ChainNode; onTurnEn
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setOpen(next), next ? HOVER_OPEN_MS : HOVER_CLOSE_MS);
   };
+  // Opens only for a pointer that moves onto the card: a card drawn under a resting pointer (Show pressed, the
+  // deck opening under it) is not a hover (fixture pictures, 26 November 2026).
+  const moved = (event: React.PointerEvent) => {
+    if (open || (event.movementX === 0 && event.movementY === 0)) return;
+    hover(event, true);
+  };
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
         <button
           type="button"
           onClick={() => setOpen((was) => !was)}
-          onPointerEnter={(event) => hover(event, true)}
+          onPointerMove={moved}
           onPointerLeave={(event) => hover(event, false)}
           aria-haspopup="dialog"
           aria-expanded={open}

@@ -109,10 +109,14 @@ export function deckLine(rows: readonly Pick<ChainNode, 'state' | 'name'>[], hel
   return held === 0 ? base : `${base} · ${held} ${held === 1 ? 'message' : 'messages'} queued`;
 }
 
-/** The folded line once all have finished: "5 agents replied", or how many replied of how many. */
+/**
+ * The folded line once all have finished: "5 agents replied"; "2 agents
+ * stopped" when the person stopped them all; else how many replied of how many.
+ */
 export function foldLine(rows: readonly Pick<ChainNode, 'state'>[]): string {
   const replied = rows.filter((row) => row.state === 'replied').length;
   if (replied === rows.length) return `${agents(rows.length)} replied`;
+  if (rows.every((row) => row.state === 'stopped')) return `${agents(rows.length)} stopped`;
   return `${replied} of ${agents(rows.length)} replied`;
 }
 
@@ -122,9 +126,12 @@ export function deckStartedAt(rows: readonly Pick<ChainNode, 'calledAt'>[]): num
   return times.length ? Math.min(...times) : null;
 }
 
-/** "0:07", "1:42", "12:05". */
+/** "0:07", "1:42", "12:05"; past an hour "1:02:05". */
 export function elapsedWords(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  const two = (n: number) => String(n).padStart(2, '0');
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return hours > 0 ? `${hours}:${two(minutes)}:${two(seconds % 60)}` : `${minutes}:${two(seconds % 60)}`;
 }
 
