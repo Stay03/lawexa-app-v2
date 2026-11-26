@@ -10,7 +10,8 @@ import type { BackgroundJob } from '@/types/background-jobs';
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
 import { makeQueryClient } from '@/v2/runtime/query';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
-import { AgentRowsProvider } from '../conversation/agents/context';
+import { AgentChainProvider } from '../conversation/agents/context';
+import { adminChainSnapshot } from './admin-chain';
 import { BackgroundJobsProvider } from '../conversation/background-jobs/context';
 import { MessageList } from '../conversation/MessageList';
 import { ReadOnlyTranscript } from '../conversation/read-only';
@@ -66,11 +67,8 @@ export function AdminTranscript({
     () => transformApiMessages(view.messages, { events: true }) as EngineMessage[],
     [view.messages],
   );
-  const readerAgents = useMemo(
-    // Staff may not type into it or stop it, and a snapshot follows no live turn: no stream is opened.
-    () => agentConversations.map((agent) => ({ ...agent, can_send: false, execution_id: null, stream_url: null })),
-    [agentConversations],
-  );
+  // A closed snapshot of the chain: staff may not type into or stop any agent, and a snapshot follows no live turn.
+  const chain = useMemo(() => adminChainSnapshot(agentConversations), [agentConversations]);
   const references = useMemo(() => view.references ?? [], [view.references]);
   const owner = view.owner;
   // One client for the page's life, with v2's defaults and no persister.
@@ -102,7 +100,7 @@ export function AdminTranscript({
           wrappedHidden
         >
           <BackgroundJobsProvider conversationId={view.id} jobs={jobs} readOnly>
-            <AgentRowsProvider conversationId={view.id} agentConversations={readerAgents}>
+            <AgentChainProvider conversationId={view.id} chain={chain}>
               <TurnFooterProvider render={turnFooter}>
                 <div data-admin-transcript="" className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
                   <MessageList
@@ -127,7 +125,7 @@ export function AdminTranscript({
                   />
                 </div>
               </TurnFooterProvider>
-            </AgentRowsProvider>
+            </AgentChainProvider>
           </BackgroundJobsProvider>
         </V2SessionProvider>
       </ReadOnlyTranscript>

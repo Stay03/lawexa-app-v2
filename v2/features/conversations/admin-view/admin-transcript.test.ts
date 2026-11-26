@@ -13,7 +13,9 @@ const read = (...parts: string[]) => readFileSync(join(process.cwd(), 'v2', 'fea
 test('the admin transcript is read-only, follows no live turn, and keeps nothing on the device', () => {
   const transcript = read('conversations', 'admin-view', 'AdminTranscript.tsx');
   assert.match(transcript, /<ReadOnlyTranscript>/);
-  assert.match(transcript, /\(\{ \.\.\.agent, can_send: false, execution_id: null, stream_url: null \}\)/);
+  // The agents as a closed snapshot of the chain (admin-chain.ts): no stream, no Stop, no typing into them.
+  assert.match(transcript, /const chain = useMemo\(\(\) => adminChainSnapshot\(agentConversations\), \[agentConversations\]\);/);
+  assert.match(transcript, /<AgentChainProvider conversationId=\{view\.id\} chain=\{chain\}>/);
   assert.match(transcript, /<BackgroundJobsProvider conversationId=\{view\.id\} jobs=\{jobs\} readOnly>/);
   // Its own query client, with v2's defaults and no persister.
   assert.match(transcript, /const \[queryClient\] = useState\(\(\) => makeQueryClient\(\)\);/);
