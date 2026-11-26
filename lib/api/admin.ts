@@ -1,10 +1,12 @@
 import { apiClient } from './client';
+import type { AdminConversationViewResponse, AdminToolResultResponse } from '@/types/admin-conversation-view';
+import type { AgentConversationListResponse } from '@/types/agent-conversations';
+import type { BackgroundJobListResponse } from '@/types/background-jobs';
 import type { ChangeableRole } from '@/components/admin/change-role-model';
 import type {
   AdminConversationsParams,
   AdminCourseConversationsParams,
   AdminConversationsListResponse,
-  AdminConversationDetailResponse,
   AdminUserDetailResponse,
   AdminFreeMessagesBlockPayload,
   AdminFreeMessagesBlockResponse,
@@ -108,15 +110,31 @@ export const adminApi = {
   },
 
   /**
-   * Get a single conversation with all messages
-   * Requires admin role
+   * One chat as its owner's chat page gets it, plus the owner, plan, model and
+   * each turn's usage (Backend aee2efb0). A Space chat answers 404.
    */
-  getConversation: async (
-    uuid: string
-  ): Promise<AdminConversationDetailResponse> => {
-    const response = await apiClient.get<AdminConversationDetailResponse>(
-      `/admin/conversations/${uuid}`
+  getConversation: async (uuid: string): Promise<AdminConversationViewResponse> => {
+    const response = await apiClient.get<AdminConversationViewResponse>(`/admin/conversations/${uuid}`);
+    return response.data;
+  },
+
+  /** A tool result the view cut at 200 kB (`metadata.result_truncated`), in full. */
+  getConversationToolResult: async (uuid: string, messageId: number): Promise<AdminToolResultResponse> => {
+    const response = await apiClient.get<AdminToolResultResponse>(
+      `/admin/conversations/${uuid}/messages/${messageId}/result`,
     );
+    return response.data;
+  },
+
+  /** The agent conversations a chat opened, as the owner's route gives them. 404 for a chat that takes none. */
+  getConversationAgentConversations: async (uuid: string): Promise<AgentConversationListResponse> => {
+    const response = await apiClient.get<AgentConversationListResponse>(`/admin/conversations/${uuid}/agent-conversations`);
+    return response.data;
+  },
+
+  /** The chat's background jobs as the owner sees them, without live progress. 404 for a chat that takes none. */
+  getConversationBackgroundJobs: async (uuid: string): Promise<BackgroundJobListResponse> => {
+    const response = await apiClient.get<BackgroundJobListResponse>(`/admin/conversations/${uuid}/background-jobs`);
     return response.data;
   },
 

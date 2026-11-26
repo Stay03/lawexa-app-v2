@@ -16,6 +16,7 @@ import {
   canvasRatio,
   pageScale,
   pdfFailure,
+  pdfLinkFailure,
   zoomIn,
   zoomLabel,
   zoomOut,
@@ -63,6 +64,7 @@ export function PdfReader({
   columnClassName,
   startPage,
   passage,
+  refusedMessage,
 }: {
   fileId: number;
   /** The file's name, for the pages' accessible names. */
@@ -81,6 +83,8 @@ export function PdfReader({
   startPage?: number | null;
   /** Words to mark on `startPage`. */
   passage?: string | null;
+  /** The sentence for a refused file (403), when the opener knows why; else the reader's neutral one. */
+  refusedMessage?: string;
 }) {
   const link = useQuery(filesQueries.inlineUrl(fileId));
   const [relinked, setRelinked] = useState(false);
@@ -91,7 +95,10 @@ export function PdfReader({
     void link.refetch().finally(() => setAttempt((count) => count + 1));
   };
 
-  if (link.isError) return <>{fallback('The PDF did not load. Try again, or download it.', again)}</>;
+  if (link.isError) {
+    const failure = pdfLinkFailure(link.error, refusedMessage);
+    return <>{fallback(failure.message, failure.retry ? again : null)}</>;
+  }
   if (url === null) {
     return (
       <div className={cn('flex min-h-full flex-col', className)}>

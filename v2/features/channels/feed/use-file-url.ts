@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { filesApi } from '@/lib/api/files';
-import { isNotFoundError } from '@/lib/utils/api-error';
+import { isForbiddenError, isNotFoundError } from '@/lib/utils/api-error';
 import {
   canShareKind,
   fetchAsFile,
@@ -69,6 +69,11 @@ export interface OpenInNewTab<T = number> {
    * thread still names them (24 September 2026). Implies `failed`.
    */
   gone: boolean;
+  /**
+   * The server answered 403: the reader may not open it, such as a Space's
+   * file in a personal chat read by someone outside the Space. Implies `failed`.
+   */
+  refused: boolean;
   /** The bytes are here and the share sheet is waiting for one more tap. */
   ready: boolean;
   /** That tap: offer the fetched file to the share sheet. */
@@ -132,9 +137,11 @@ export function useOpenUrlInNewTab<T>(mint: (target: T) => Promise<string | null
   const shareSheet = useShareSheetSave(mint);
   const [failed, setFailed] = useState(false);
   const [gone, setGone] = useState(false);
+  const [refused, setRefused] = useState(false);
   const openInTab = (target: T) => {
     setFailed(false);
     setGone(false);
+    setRefused(false);
     const tab = window.open('', '_blank');
     if (!tab) {
       setFailed(true);
@@ -154,6 +161,7 @@ export function useOpenUrlInNewTab<T>(mint: (target: T) => Promise<string | null
         tab.close();
         setFailed(true);
         setGone(isNotFoundError(error));
+        setRefused(isForbiddenError(error));
       },
     });
   };
@@ -169,6 +177,7 @@ export function useOpenUrlInNewTab<T>(mint: (target: T) => Promise<string | null
     opening: fresh.isPending || shareSheet.saving,
     failed: failed || shareSheet.failed,
     gone: gone || shareSheet.gone,
+    refused,
     ready: shareSheet.ready,
     save: shareSheet.save,
   };

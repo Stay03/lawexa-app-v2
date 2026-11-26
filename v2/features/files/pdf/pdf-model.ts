@@ -1,3 +1,5 @@
+import { isForbiddenError, isNotFoundError } from '@/lib/utils/api-error';
+
 /**
  * pdf-model — the PDF reader's decisions, pure: no pdf.js, no React, so they
  * can be read and tested on their own (the in-app PDF reader, the file list
@@ -100,4 +102,18 @@ export function pdfFailure(error: unknown): PdfFailure {
     return { kind: 'relink', message: 'The link to this PDF has expired.', retry: true };
   }
   return { kind: 'failed', message: 'The PDF did not load. Try again, or download it.', retry: true };
+}
+
+/**
+ * Why the reader could not get a link to the PDF (`GET /files/{id}/download`),
+ * in the reader's own words, and whether Try again can help. A 403 is a file
+ * the reader may not open and a 404 a file that is gone: trying again cannot
+ * help either. The reader serves chats, channels and folders, so its own 403
+ * sentence names no place; an opener that knows why passes its own (a chat's
+ * file from a Space: "Opens for Space members only."; thread 085a980c).
+ */
+export function pdfLinkFailure(error: unknown, refusedMessage?: string): { message: string; retry: boolean } {
+  if (isForbiddenError(error)) return { message: refusedMessage ?? 'You don’t have access to this file.', retry: false };
+  if (isNotFoundError(error)) return { message: 'This file is no longer available.', retry: false };
+  return { message: 'The PDF did not load. Try again, or download it.', retry: true };
 }

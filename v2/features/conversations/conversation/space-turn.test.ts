@@ -419,7 +419,8 @@ test('a reader who may not send gets disabled card actions, and the screen sends
   for (const card of ['DeepResearchPromptCard', 'MultiQuestionPlanCard', 'MultiQuestionPromptCard', 'NextQuestionPromptCard']) {
     assert.match(
       readHere(join('cards', `${card}.tsx`)),
-      /disabled=\{clicked \|\| isInteracted \|\| chatContext\?\.isStreaming \|\| chatContext\?\.canSend === false\}/,
+      // …and inside a transcript drawn for staff (the admin view, read-only.tsx), never pressable either.
+      /disabled=\{clicked \|\| isInteracted \|\| chatContext\?\.isStreaming \|\| chatContext\?\.canSend === false \|\| readOnly\}/,
       card,
     );
   }

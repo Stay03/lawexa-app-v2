@@ -23,6 +23,7 @@ import { PrivateItemAsk, UsedItemsLine } from '@/v2/features/private-items/Priva
 import { MachineInUseCard, MachineWaitEndedNote } from '@/v2/features/userbox/MachineChatNotes';
 import { replyTargetOf, type ReplyableRow } from '../reply-target';
 import { SwipeToReply } from './SwipeToReply';
+import { TurnFooter } from './turn-footer';
 
 /**
  * AssistantMessageRow — the streaming answer row, and the proof of the "list never
@@ -214,6 +215,8 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
               onReply={reply}
             />
           )}
+          {/* The admin view's staff line (turn-footer.tsx); nothing on the chat page. */}
+          {!isStreaming && !draining && <TurnFooter rowId={message.id} />}
         </div>
       </AnswerScope>
     </SwipeToReply>
