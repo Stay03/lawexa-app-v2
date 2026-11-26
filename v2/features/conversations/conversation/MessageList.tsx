@@ -748,8 +748,8 @@ export function MessageList({
           ref={contentRef}
           className={cn(
             'mx-auto flex max-w-2xl flex-col gap-6 px-4 pt-6',
-            // Read in a page, the column lines up with the page's left edge, and no composer floats over it.
-            flow ? 'mx-0 px-0 pb-6' : 'pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]',
+            // Read in a page, the column is the page's own (it fills it), and no composer floats over it.
+            flow ? 'mx-0 max-w-none px-0 pb-6' : 'pb-[calc(var(--v2-conv-dock-h,7rem)+1rem)]',
             anchorBottom && 'min-h-full justify-end',
           )}
         >

@@ -83,7 +83,7 @@ export function AdminConversationScreen({ id }: { id: string }) {
 
   if (!view) {
     return (
-      <div className="space-y-4">
+      <div className={`${COLUMN} space-y-4`}>
         <BackLink />
         <div className="rounded-lg border px-6 py-10 text-center">
           <p className="font-medium">
@@ -106,7 +106,7 @@ export function AdminConversationScreen({ id }: { id: string }) {
 
   const hasMessages = view.messages.length > 0;
   return (
-    <div className="flex flex-col gap-5">
+    <div className={`${COLUMN} flex flex-col gap-5`}>
       <BackLink />
       <ChatHeader
         view={view}
@@ -155,6 +155,13 @@ export function AdminConversationScreen({ id }: { id: string }) {
     </div>
   );
 }
+
+/**
+ * One centred column for the header, the tabs and the chat (Techlead's check,
+ * 26 November 2026): on a wide screen they line up, as the owner's chat
+ * centres its own column.
+ */
+const COLUMN = 'mx-auto w-full max-w-[50rem]';
 
 /** The nearest box that scrolls (the admin shell's content region). */
 function scrollParent(node: HTMLElement): HTMLElement | null {
@@ -348,7 +355,7 @@ function BackLink() {
 
 function ScreenSkeleton() {
   return (
-    <div className="flex flex-col gap-5">
+    <div className={`${COLUMN} flex flex-col gap-5`}>
       <Skeleton className="h-8 w-32" />
       <div className="flex flex-col gap-3 border-b pb-5">
         <Skeleton className="h-7 w-2/3" />
