@@ -44,6 +44,12 @@ import { seedEarlyRuling } from '@/v2/features/conversations/conversation/early-
 import { ActivityStatus } from '@/v2/features/conversations/conversation/ActivityStatus';
 import { REDACTING_LABEL } from '@/v2/features/conversations/conversation/redaction-wait';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { dictationApi } from '@/lib/api/dictation';
+import { DictateButton } from '@/v2/features/dictation/DictateButton';
+import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
+import type { DictationResult } from '@/v2/features/dictation/dictation-controller';
+import { dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
+import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
 import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { extractApiError, extractBlockedReason, extractUploadLimit } from '@/lib/utils/api-error';
 import { PlansLink } from '@/v2/features/files/PlansLink';
@@ -271,7 +277,7 @@ export function HomeComposer({
     textarea: () => boxRef.current?.querySelector('textarea') ?? null,
   });
   const queryClient = useQueryClient();
-  const { userId } = useV2Session();
+  const { userId, canDictate } = useV2Session();
   // A template or skill brought here by "Use in chat" (?use=), sent with the first message.
   const using = useUsingItem();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -442,8 +448,10 @@ export function HomeComposer({
   };
 
   // ── Submit ───────────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
-    const message = value.trim();
+  const handleSubmit = () => submit(value.trim());
+
+  /** Send the first message: typed (the box's words), or dictated (its words and, when kept, its voice). */
+  const submit = async (message: string, voiceClipId?: number) => {
     // A refusal for messages holds Send until the text changes (Enter alone
     // would only ask again and be refused again).
     if (
@@ -488,6 +496,7 @@ export function HomeComposer({
           references,
           spaceUuid: space?.uuid,
           ...(using.item && { useItems: [using.item] }),
+          ...(voiceClipId !== undefined && { voiceClipId }),
         },
         { queryClient },
       );
@@ -566,6 +575,36 @@ export function HomeComposer({
     }
   };
 
+  // ── Dictation (design A2; Arthur, 26 November 2026: every message box has it) ──
+  // A new confidential or redacted chat keeps no voice (the server refuses the clip there): its words go alone.
+  const voiceKept = keepsVoice({ isConfidential: confidential, isRedacted: redacted });
+  const sendHeld = blocked !== null || isSubmitting || isUploading || hasFailedUpload || refusedByMode.length > 0;
+  /** Listening ended with Send: the voice goes up (when kept), then the words go with its id. */
+  const sendDictated = async ({ text, clip, durationMs }: DictationResult) => {
+    // Something holds Send: the words wait in the box as typed words.
+    if (sendHeld) {
+      onValueChange(joinText(value, text));
+      return;
+    }
+    let voiceClipId: number | undefined;
+    if (clip && voiceKept) {
+      try {
+        const answer = await dictationApi.uploadClip(clip, durationMs);
+        if (answer.data) voiceClipId = answer.data.id;
+      } catch {
+        // The words still go; the chat opens on them without a voice.
+      }
+    }
+    await submit(text, voiceClipId);
+  };
+  const { state: dictating, dictation } = useDictation({
+    onSend: (result) => void sendDictated(result),
+    onProblem: (kind, message) => setError(dictationProblemLine(kind, message)),
+  });
+  const dictationOpen = isDictating(dictating);
+  // Dictate holds Send's place while the box is empty; Send takes it back once there is something to send.
+  const offerDictate = signedIn && canDictate && !dictationOpen && value.trim() === '' && uploads.length === 0;
+
   // Keep clicks inside portaled menus from bubbling to PromptInput's root (see
   // the PORTAL-EVENT NOTE above).
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
@@ -634,6 +673,8 @@ export function HomeComposer({
         </div>
       ) : null}
 
+      <DictationCountdown state={dictating} dictation={dictation} />
+
       {/* Confidential surface cue — a soft emerald ring that fades in/out with the
           mode (the primitive swaps its own outline; this animates the whole surface
           so the change never just snaps). */}
@@ -656,6 +697,8 @@ export function HomeComposer({
           }}
           onSubmit={handleSubmit}
           disabled={isSubmitting}
+          // Never more than about a third of the visible screen (a phone with its keyboard up).
+          maxHeight="min(240px, 35dvh)"
           variant={confidential ? 'confidential' : 'default'}
           className={className}
         >
@@ -754,150 +797,174 @@ export function HomeComposer({
             />
           ) : null}
 
-          <PromptInputTextarea
-            placeholder={placeholder}
-            className={cn('text-foreground placeholder:text-muted-foreground', textareaClassName)}
-            /* Pasting a picture here does what the attach button does, and what
-               pasting one into the conversation composer does. A screenshot
-               landing in one box and vanishing in the other is the kind of
-               difference somebody finds by accident. */
-            onPasteFiles={(files) => void handleFilesAdded(files)}
-            {...mentionPicker.textareaProps}
-          />
+          {dictationOpen ? (
+            <div className="px-1 pt-1 pb-1">
+              <DictationPanel state={dictating} dictation={dictation} canSend={!sendHeld} isSending={isSubmitting} />
+            </div>
+          ) : (
+            <>
+              <PromptInputTextarea
+                placeholder={placeholder}
+                className={cn('text-foreground placeholder:text-muted-foreground', textareaClassName)}
+                /* Pasting a picture here does what the attach button does, and what
+                   pasting one into the conversation composer does. A screenshot
+                   landing in one box and vanishing in the other is the kind of
+                   difference somebody finds by accident. */
+                onPasteFiles={(files) => void handleFilesAdded(files)}
+                {...mentionPicker.textareaProps}
+              />
 
-          <PromptInputActions className="flex items-center gap-2 px-2 pb-1">
-            {signedIn ? (
-              // Horizontally-scrollable toolbar keeps every control reachable at
-              // 320px without wrapping the row. py-0.5: overflow-x-auto forces
-              // overflow-y to auto, which would clip the + focus ring otherwise.
-              <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {/* Plus-menu: Attach + consolidated privacy toggles. */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Attach files and privacy options"
-                      onClick={stop}
-                      disabled={isSubmitting}
-                      className="v2-interactive relative flex size-9 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Plus className="size-5" />
-                      {/* Redacted dot — scales+fades both ways, never a hard pop. */}
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'absolute right-1 top-1 size-1.5 rounded-full bg-indigo-500 ring-2 ring-background transition-all duration-150 motion-reduce:transition-none',
-                          redacted ? 'scale-100 opacity-100' : 'scale-0 opacity-0',
+              <PromptInputActions className="flex items-center gap-2 px-2 pb-1">
+                {signedIn ? (
+                  // Horizontally-scrollable toolbar keeps every control reachable at
+                  // 320px without wrapping the row. py-0.5: overflow-x-auto forces
+                  // overflow-y to auto, which would clip the + focus ring otherwise.
+                  <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {/* Plus-menu: Attach + consolidated privacy toggles. */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Attach files and privacy options"
+                          onClick={stop}
+                          disabled={isSubmitting}
+                          className="v2-interactive relative flex size-9 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Plus className="size-5" />
+                          {/* Redacted dot — scales+fades both ways, never a hard pop. */}
+                          <span
+                            aria-hidden
+                            className={cn(
+                              'absolute right-1 top-1 size-1.5 rounded-full bg-indigo-500 ring-2 ring-background transition-all duration-150 motion-reduce:transition-none',
+                              redacted ? 'scale-100 opacity-100' : 'scale-0 opacity-0',
+                            )}
+                          />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        side="top"
+                        sideOffset={8}
+                        className="w-72"
+                        onClick={stop}
+                      >
+                        <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+                          <Paperclip className="text-muted-foreground" />
+                          <span className="flex-1">Attach files</span>
+                          <span className="text-xs text-muted-foreground">
+                            {attachmentHintIn(privateMode, uploadLimits, fileRule)}
+                          </span>
+                        </DropdownMenuItem>
+
+                        {/* No private modes in a space: the server refuses both there. */}
+                        {space ? null : (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Privacy</DropdownMenuLabel>
+
+                            <DropdownMenuCheckboxItem
+                              checked={redacted}
+                              onCheckedChange={setRedacted}
+                              onSelect={(event) => event.preventDefault()}
+                            >
+                              <VenetianMask
+                                className={redacted ? 'text-indigo-500' : 'text-muted-foreground'}
+                              />
+                              <span className="flex flex-col">
+                                <span className="font-medium leading-tight">Redacted mode</span>
+                                <span className="text-xs text-muted-foreground">
+                                  Hide names, addresses &amp; IDs from the model
+                                </span>
+                              </span>
+                            </DropdownMenuCheckboxItem>
+
+                            <DropdownMenuCheckboxItem
+                              checked={confidential}
+                              onCheckedChange={onConfidentialChange}
+                              onSelect={(event) => event.preventDefault()}
+                            >
+                              <ShieldCheck
+                                className={
+                                  confidential
+                                    ? 'text-emerald-600 dark:text-emerald-500'
+                                    : 'text-muted-foreground'
+                                }
+                              />
+                              <span className="flex flex-col">
+                                <span className="font-medium leading-tight">Confidential mode</span>
+                                <span className="text-xs text-muted-foreground">
+                                  Stored only on this device until you delete it
+                                </span>
+                              </span>
+                            </DropdownMenuCheckboxItem>
+                          </>
                         )}
-                      />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    side="top"
-                    sideOffset={8}
-                    className="w-72"
-                    onClick={stop}
-                  >
-                    <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
-                      <Paperclip className="text-muted-foreground" />
-                      <span className="flex-1">Attach files</span>
-                      <span className="text-xs text-muted-foreground">
-                        {attachmentHintIn(privateMode, uploadLimits, fileRule)}
-                      </span>
-                    </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
 
-                    {/* No private modes in a space: the server refuses both there. */}
-                    {space ? null : (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Privacy</DropdownMenuLabel>
+                    {/* Role-aware workflow selector — v1's Lite/Expert or admin list. */}
+                    <WorkflowField
+                      options={workflow.options}
+                      value={workflow.value}
+                      onChange={workflow.setValue}
+                      isLoading={workflow.isLoading}
+                      disabled={isSubmitting}
+                      stop={stop}
+                    />
 
-                        <DropdownMenuCheckboxItem
-                          checked={redacted}
-                          onCheckedChange={setRedacted}
-                          onSelect={(event) => event.preventDefault()}
-                        >
-                          <VenetianMask
-                            className={redacted ? 'text-indigo-500' : 'text-muted-foreground'}
-                          />
-                          <span className="flex flex-col">
-                            <span className="font-medium leading-tight">Redacted mode</span>
-                            <span className="text-xs text-muted-foreground">
-                              Hide names, addresses &amp; IDs from the model
-                            </span>
-                          </span>
-                        </DropdownMenuCheckboxItem>
-
-                        <DropdownMenuCheckboxItem
-                          checked={confidential}
-                          onCheckedChange={onConfidentialChange}
-                          onSelect={(event) => event.preventDefault()}
-                        >
-                          <ShieldCheck
-                            className={
-                              confidential
-                                ? 'text-emerald-600 dark:text-emerald-500'
-                                : 'text-muted-foreground'
-                            }
-                          />
-                          <span className="flex flex-col">
-                            <span className="font-medium leading-tight">Confidential mode</span>
-                            <span className="text-xs text-muted-foreground">
-                              Stored only on this device until you delete it
-                            </span>
-                          </span>
-                        </DropdownMenuCheckboxItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Role-aware workflow selector — v1's Lite/Expert or admin list. */}
-                <WorkflowField
-                  options={workflow.options}
-                  value={workflow.value}
-                  onChange={workflow.setValue}
-                  isLoading={workflow.isLoading}
-                  disabled={isSubmitting}
-                  stop={stop}
-                />
-
-              </div>
-            ) : (
-              <span className="flex-1" />
-            )}
-
-            {/* Send — the primary action. ≥44px on mobile; spins while creating. */}
-            <PromptInputAction tooltip="Send message">
-              <Button
-                type="button"
-                size="icon"
-                className={cn(
-                  'v2-interactive size-11 shrink-0 rounded-full bg-primary hover:bg-primary/90',
-                  sendButtonClassName,
-                )}
-                onClick={handleSubmit}
-                disabled={
-                  !canSend ||
-                  blocked !== null ||
-                  isUploading ||
-                  isSubmitting ||
-                  hasFailedUpload ||
-                  refusedByMode.length > 0
-                }
-                aria-label="Send message"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="size-5 animate-spin" />
+                  </div>
                 ) : (
-                  <ArrowUp className="size-5" />
+                  <span className="flex-1" />
                 )}
-              </Button>
-            </PromptInputAction>
-          </PromptInputActions>
+
+                {/* Dictate holds Send's place while the box is empty (≥44px, as Send). */}
+                {offerDictate ? (
+                  <PromptInputAction tooltip="Dictate">
+                    <DictateButton
+                      onStart={() => {
+                        if (error) setError(null);
+                        void dictation.start();
+                      }}
+                      disabled={isSubmitting}
+                      className="size-11"
+                    />
+                  </PromptInputAction>
+                ) : (
+                  /* Send — the primary action. ≥44px on mobile; spins while creating. */
+                  <PromptInputAction tooltip="Send message">
+                    <Button
+                      type="button"
+                      size="icon"
+                      className={cn(
+                        'v2-interactive size-11 shrink-0 rounded-full bg-primary hover:bg-primary/90',
+                        sendButtonClassName,
+                      )}
+                      onClick={handleSubmit}
+                      disabled={
+                        !canSend ||
+                        blocked !== null ||
+                        isUploading ||
+                        isSubmitting ||
+                        hasFailedUpload ||
+                        refusedByMode.length > 0
+                      }
+                      aria-label="Send message"
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="size-5 animate-spin" />
+                      ) : (
+                        <ArrowUp className="size-5" />
+                      )}
+                    </Button>
+                  </PromptInputAction>
+                )}
+              </PromptInputActions>
+            </>
+          )}
         </PromptInput>
       </div>
+
+      {dictationOpen ? <DictationHint state={dictating} /> : null}
 
       {/* Drag-and-drop overlay — signed-in only (guests get no attachments). */}
       {signedIn ? (

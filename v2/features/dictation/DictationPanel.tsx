@@ -45,22 +45,27 @@ export function DictationPanel({
   const hasAnyWords = state.text.trim() !== '' || state.partial.trim() !== '';
 
   return (
-    <div className="flex flex-col" onClick={(event) => event.stopPropagation()}>
+    // THE PANEL IS AS WIDE AS ITS BOX, NEVER WIDER (Arthur's recording, iPhone, 26 November 2026): the sound bar's
+    // bars filled in, the controls' row asked for ~440 px, the panel took that width as its own and the box ran off
+    // the screen, its words cut off at the right. `w-full min-w-0 max-w-full` here, `min-w-0` on the row, and a
+    // sound bar that cannot ask for width (SoundBar) keep it to the box; long words wrap.
+    <div className="flex w-full max-w-full min-w-0 flex-col" onClick={(event) => event.stopPropagation()}>
       {paused ? (
         <textarea
           aria-label="Dictated message"
           value={state.text}
           onChange={(event) => dictation.setText(event.target.value)}
           rows={2}
-          autoFocus
-          className="text-foreground max-h-[150px] min-h-12 w-full resize-none bg-transparent px-3 pt-2 pb-1 text-base leading-relaxed [field-sizing:content] focus:outline-none md:text-[15px]"
+          // No autoFocus: on a phone it opened the keyboard on Pause (Arthur, 26 November 2026). The words are
+          // edited when the reader taps them.
+          className="text-foreground max-h-[min(150px,30dvh)] min-h-12 w-full resize-none bg-transparent px-3 pt-2 pb-1 text-base leading-relaxed [field-sizing:content] [overflow-wrap:anywhere] focus:outline-none md:text-[15px]"
         />
       ) : (
         <div
           ref={wordsRef}
           aria-live="polite"
           aria-label="Dictated message"
-          className="text-foreground max-h-[150px] min-h-12 overflow-y-auto px-3 pt-2 pb-1 text-base leading-relaxed md:text-[15px]"
+          className="text-foreground max-h-[min(150px,30dvh)] min-h-12 overflow-y-auto overscroll-y-contain px-3 pt-2 pb-1 text-base leading-relaxed [overflow-wrap:anywhere] md:text-[15px]"
         >
           {state.text}
           {state.partial ? <span className="text-muted-foreground"> {state.partial}</span> : null}
@@ -73,7 +78,7 @@ export function DictationPanel({
         </div>
       )}
 
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex min-w-0 items-center gap-2 pt-1">
         <button type="button" aria-label="Cancel dictation" onClick={() => void dictation.cancel()} className={cn(ROUND, 'bg-secondary text-foreground hover:bg-secondary/80')}>
           <X aria-hidden className="size-4" />
         </button>
@@ -86,7 +91,7 @@ export function DictationPanel({
               hearing ? 'bg-red-600 shadow-[0_0_0_4px_rgba(220,38,38,0.14)] dark:bg-red-500' : 'bg-muted-foreground/50',
             )}
           />
-          <span className="text-muted-foreground text-[13px] tabular-nums" aria-label="Time dictated">
+          <span className="text-muted-foreground shrink-0 text-[13px] tabular-nums" aria-label="Time dictated">
             {timerLabel(state.elapsedMs)}
           </span>
           <SoundBar levels={state.levels} quiet={!hearing} />
@@ -128,17 +133,26 @@ export function DictationPanel({
   );
 }
 
-/** The last loudness readings as bars, newest on the right; faint while not hearing. */
+/** The bars drawn: the newest readings only, about 150 px of them. */
+export const SOUND_BARS = 28;
+
+/**
+ * The last loudness readings as bars, newest on the right; faint while not
+ * hearing. It takes the room the row leaves and never asks for more:
+ * `basis-0` and `[contain:inline-size]` give it no width of its own to
+ * offer the row, `max-w-[160px]` stops it there, and only the newest
+ * {@link SOUND_BARS} are drawn, so a long dictation cannot lengthen it.
+ */
 function SoundBar({ levels, quiet }: { levels: number[]; quiet: boolean }) {
   return (
     <span
       aria-hidden
       className={cn(
-        'flex h-[22px] min-w-0 flex-1 items-center justify-end gap-[2.5px] overflow-hidden transition-opacity [mask-image:linear-gradient(to_right,transparent,#000_18%,#000_82%,transparent)]',
+        'flex h-[22px] min-w-0 max-w-[160px] grow basis-0 items-center justify-end gap-[2.5px] overflow-hidden transition-opacity [contain:inline-size] [mask-image:linear-gradient(to_right,transparent,#000_18%,#000_82%,transparent)]',
         quiet && 'opacity-35',
       )}
     >
-      {levels.map((level, index) => (
+      {levels.slice(-SOUND_BARS).map((level, index) => (
         <i
           // The bars shift left as readings arrive; the position is the identity.
           key={index}

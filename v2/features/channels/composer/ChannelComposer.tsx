@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AtSign,
   CornerUpLeft,
+  AudioLines,
   Mic,
   Paperclip,
   SendHorizontal,
@@ -64,6 +65,10 @@ import { MemberAvatar, LawexaAvatar } from '../ui/avatars';
 import type { TypingUser } from '../room';
 import { useHeldValue } from '../use-held-value';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { DictateButton } from '@/v2/features/dictation/DictateButton';
+import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
+import { dictationProblemLine, joinText } from '@/v2/features/dictation/dictation-model';
+import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
 import {
   ChatComposerShell,
   ComposerAction,
@@ -656,8 +661,11 @@ function ChannelComposerBody({
   // first (`user.can_record`), and only where the reader may post. A thread is
   // a channel with a parent; the recording names the Space, the channel and
   // the thread, and its card and Lawexa's summary are posted there.
-  const { canRecord } = useV2Session();
+  const { canRecord, canDictate } = useV2Session();
   const recordable = canRecord && channel.can_post !== false;
+  // Dictation (Arthur, 26 November 2026: every message box has it), where the reader may post.
+  // A channel message keeps no voice (its route takes none), so only the words go.
+  const dictable = canDictate && channel.can_post !== false;
   const { state: recording, recorder } = useRecorder(channelRecordingTarget(channel));
   const recorderOpen = recording.phase === 'live' || recording.phase === 'stopping' || recording.phase === 'finalising';
   const [value, setValue] = useState(() => saved?.text ?? '');
@@ -1338,8 +1346,28 @@ function ChannelComposerBody({
     onCancelReply();
   };
 
-  const handleSend = () => {
-    const content = value.trim();
+  /** Listening ended with Send: the words go, unless something holds Send, when they wait in the box. */
+  const sendDictatedWords = (text: string) => {
+    const held = uploading.length > 0 || restoreChecking || text.trim().length > MESSAGE_MAX_LENGTH;
+    if (held) {
+      setValue((current) => joinText(current, text));
+      return;
+    }
+    sendText(text);
+  };
+  const { state: dictating, dictation } = useDictation({
+    onSend: ({ text }) => sendDictatedWords(text),
+    onProblem: (kind, message) => setNotice(dictationProblemLine(kind, message)),
+  });
+  const dictationOpen = isDictating(dictating);
+  // Dictate holds Send's place while the box is empty; Send takes it back once there is something to send.
+  const offerDictate = dictable && !dictationOpen && value.trim() === '' && staged.length === 0 && uploading.length === 0;
+
+  const handleSend = () => sendText(value);
+
+  /** Send a message: the box's typed words, or a dictation's words. */
+  const sendText = (typed: string) => {
+    const content = typed.trim();
     if (content.length > MESSAGE_MAX_LENGTH) return;
     // A send while an upload is still on the wire would post without it. The
     // button says so in its accessible name; Enter has no button to say it
@@ -1492,6 +1520,7 @@ function ChannelComposerBody({
       typing={{ label: typingShown ?? '', visible: typing }}
       tray={
         <>
+          <DictationCountdown state={dictating} dictation={dictation} />
           {/* Mention autocomplete — floats above the whole tray. It opens for
               a line that has nothing to OFFER but something to SAY, which is
               the live state today: every row is a person with a handle, and
@@ -1798,134 +1827,148 @@ function ChannelComposerBody({
       }
       rowRef={rowRef}
       actions={
-        <>
-          {/* `hidden` is `display: none`, so this is not a flex item and cannot
-              disturb either arrangement. */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept={FILE_ACCEPT_ATTR}
-            className="hidden"
-            onChange={(event) => {
-              attachFiles(Array.from(event.target.files ?? []));
-              // Let the same file be chosen twice in a row.
-              event.target.value = '';
-            }}
-          />
+        dictationOpen ? null : (
+          <>
+            {/* `hidden` is `display: none`, so this is not a flex item and cannot
+                disturb either arrangement. */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={FILE_ACCEPT_ATTR}
+              className="hidden"
+              onChange={(event) => {
+                attachFiles(Array.from(event.target.files ?? []));
+                // Let the same file be chosen twice in a row.
+                event.target.value = '';
+              }}
+            />
 
-          <ComposerAction
-            label="Attach a file"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Paperclip aria-hidden className="size-4" />
-          </ComposerAction>
-
-          <ComposerAction
-            label="Mention someone"
-            onClick={() => insertAtCaret('@', { spaceGuard: true, thenDetect: true })}
-          >
-            <AtSign aria-hidden className="size-4" />
-          </ComposerAction>
-
-          {recordable ? (
-            <ComposerAction label="Record a meeting" onClick={recorder.ask}>
-              <Mic aria-hidden className="size-4" />
+            <ComposerAction
+              label="Attach a file"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip aria-hidden className="size-4" />
             </ComposerAction>
-          ) : null}
 
-          <EmojiInsert onPick={(emoji) => insertAtCaret(emoji)} />
-        </>
+            <ComposerAction
+              label="Mention someone"
+              onClick={() => insertAtCaret('@', { spaceGuard: true, thenDetect: true })}
+            >
+              <AtSign aria-hidden className="size-4" />
+            </ComposerAction>
+
+            {recordable ? (
+              <ComposerAction label="Record a meeting" onClick={recorder.ask}>
+                {/* Beside Dictate's microphone, the recorder takes the sound-wave mark. */}
+                {dictable ? <AudioLines aria-hidden className="size-4" /> : <Mic aria-hidden className="size-4" />}
+              </ComposerAction>
+            ) : null}
+
+            <EmojiInsert onPick={(emoji) => insertAtCaret(emoji)} />
+          </>
+        )
       }
       trailing={
-        <>
-          {remaining <= COUNTER_AT && (
-            <span
-              aria-live="polite"
-              className={cn(
-                'shrink-0 text-xs tabular-nums',
-                remaining < 0
-                  ? 'font-medium text-destructive'
-                  : 'text-muted-foreground',
-              )}
-            >
-              {remaining}
-            </span>
-          )}
+        dictationOpen ? null : (
+          <>
+            {remaining <= COUNTER_AT && (
+              <span
+                aria-live="polite"
+                className={cn(
+                  'shrink-0 text-xs tabular-nums',
+                  remaining < 0
+                    ? 'font-medium text-destructive'
+                    : 'text-muted-foreground',
+                )}
+              >
+                {remaining}
+              </span>
+            )}
 
-          <Button
-            type="button"
-            size="icon"
-            className="size-8 shrink-0 rounded-lg"
-            onClick={handleSend}
-            disabled={!canSend}
-            aria-label={sendBlockedReason ?? 'Send message'}
-            title={sendBlockedReason ?? 'Send message'}
-          >
-            <SendHorizontal aria-hidden className="size-4" />
-          </Button>
-        </>
+            {offerDictate ? (
+              <DictateButton onStart={() => void dictation.start()} />
+            ) : (
+              <Button
+                type="button"
+                size="icon"
+                className="size-8 shrink-0 rounded-lg"
+                onClick={handleSend}
+                disabled={!canSend}
+                aria-label={sendBlockedReason ?? 'Send message'}
+                title={sendBlockedReason ?? 'Send message'}
+              >
+                <SendHorizontal aria-hidden className="size-4" />
+              </Button>
+            )}
+          </>
+        )
       }
     >
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(event) => {
-          setValue(event.target.value);
-          detectMention(
-            event.target.value,
-            event.target.selectionStart ?? event.target.value.length,
-          );
-          if (event.target.value.trim()) onTyping();
-        }}
-        onKeyDown={handleKeyDown}
-        // PASTE A PICTURE AND IT ATTACHES, which is the whole affordance: a
-        // screenshot is the commonest thing anyone has on a clipboard, and
-        // before this it silently did nothing at all. It runs the SAME path as
-        // the paperclip — same allow-list, same cap, same staging tray, same
-        // send — so a pasted file and a picked one cannot behave differently.
-        //
-        // A PASTE THAT ALSO CARRIES WORDS KEEPS ITS WORDS. Copying a cell out
-        // of a spreadsheet, or a block of rich text, puts both a picture and
-        // plain text on the clipboard; swallowing the text there would break
-        // ordinary pasting to serve the rarer case. So the default is only
-        // prevented when the clipboard has nothing to type.
-        onPaste={(event) => {
-          const files = filesFromClipboard(event.clipboardData);
-          if (files.length === 0) return;
-          if (!event.clipboardData.getData('text/plain').trim()) {
-            event.preventDefault();
-          }
-          attachFiles(files);
-        }}
-        rows={1}
-        maxLength={MESSAGE_MAX_LENGTH}
-        // The visible line is fixed and the channel's name is in the label —
-        // see {@link PLACEHOLDER} for why the two say different things.
-        placeholder={PLACEHOLDER}
-        aria-label={`Message ${channelDisplayName(channel)}`}
-        // `w-full`, not `flex-1`: the shell's wrapper is the flex item now, and
-        // it is what widens to the full row once the message outgrows one line.
-        //
-        // `block` IS LOAD-BEARING, and its absence was a real defect rather
-        // than a style. A `<textarea>` is inline-level by default, so it sat on
-        // a line box in its wrapper and the wrapper reserved the font's DESCENT
-        // under it — measured 2026-08-06, six phantom pixels below the box on
-        // every arrangement. They made the row six pixels taller than the box it
-        // contains, and because the row is `items-end` they also pushed the
-        // three verbs six pixels BELOW the text they sit beside on one line.
-        //
-        // `px-2`, NOT `px-1`, because the composer already HAS a content inset
-        // and the input was not using it: the row's `p-1.5` plus the 8px a
-        // `size-4` glyph is centred by inside a `size-8` control puts every icon
-        // in this surface — paperclip, mention, emoji, Send — at 14px from the
-        // edge. 4px of padding put the words at 10px, so expanded (where the
-        // text sits directly above the verbs) the block read ragged. 8px is that
-        // same 14px, and both edges of the surface now have ONE inset.
-        className="block max-h-[200px] min-h-8 w-full resize-none bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-muted-foreground sm:text-sm"
-      />
+      {dictationOpen ? (
+        <DictationPanel state={dictating} dictation={dictation} canSend={uploading.length === 0 && !restoreChecking} isSending={false} />
+      ) : (
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+            detectMention(
+              event.target.value,
+              event.target.selectionStart ?? event.target.value.length,
+            );
+            if (event.target.value.trim()) onTyping();
+          }}
+          onKeyDown={handleKeyDown}
+          // PASTE A PICTURE AND IT ATTACHES, which is the whole affordance: a
+          // screenshot is the commonest thing anyone has on a clipboard, and
+          // before this it silently did nothing at all. It runs the SAME path as
+          // the paperclip — same allow-list, same cap, same staging tray, same
+          // send — so a pasted file and a picked one cannot behave differently.
+          //
+          // A PASTE THAT ALSO CARRIES WORDS KEEPS ITS WORDS. Copying a cell out
+          // of a spreadsheet, or a block of rich text, puts both a picture and
+          // plain text on the clipboard; swallowing the text there would break
+          // ordinary pasting to serve the rarer case. So the default is only
+          // prevented when the clipboard has nothing to type.
+          onPaste={(event) => {
+            const files = filesFromClipboard(event.clipboardData);
+            if (files.length === 0) return;
+            if (!event.clipboardData.getData('text/plain').trim()) {
+              event.preventDefault();
+            }
+            attachFiles(files);
+          }}
+          rows={1}
+          maxLength={MESSAGE_MAX_LENGTH}
+          // The visible line is fixed and the channel's name is in the label —
+          // see {@link PLACEHOLDER} for why the two say different things.
+          placeholder={PLACEHOLDER}
+          aria-label={`Message ${channelDisplayName(channel)}`}
+          // `w-full`, not `flex-1`: the shell's wrapper is the flex item now, and
+          // it is what widens to the full row once the message outgrows one line.
+          //
+          // `block` IS LOAD-BEARING, and its absence was a real defect rather
+          // than a style. A `<textarea>` is inline-level by default, so it sat on
+          // a line box in its wrapper and the wrapper reserved the font's DESCENT
+          // under it — measured 2026-08-06, six phantom pixels below the box on
+          // every arrangement. They made the row six pixels taller than the box it
+          // contains, and because the row is `items-end` they also pushed the
+          // three verbs six pixels BELOW the text they sit beside on one line.
+          //
+          // `px-2`, NOT `px-1`, because the composer already HAS a content inset
+          // and the input was not using it: the row's `p-1.5` plus the 8px a
+          // `size-4` glyph is centred by inside a `size-8` control puts every icon
+          // in this surface — paperclip, mention, emoji, Send — at 14px from the
+          // edge. 4px of padding put the words at 10px, so expanded (where the
+          // text sits directly above the verbs) the block read ragged. 8px is that
+          // same 14px, and both edges of the surface now have ONE inset.
+          className="block max-h-[min(200px,35dvh)] min-h-8 w-full resize-none bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-muted-foreground sm:text-sm"
+        />
+      )}
     </ChatComposerShell>
       )}
+      {dictationOpen ? <DictationHint state={dictating} /> : null}
     </>
   );
 }
