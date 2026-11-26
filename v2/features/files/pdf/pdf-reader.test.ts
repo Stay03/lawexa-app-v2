@@ -115,3 +115,13 @@ test('a locked, broken, missing or expired PDF says so in a clear sentence', () 
     retry: true,
   });
 });
+
+test('a refused or missing link says why and offers no Try again; anything else can be tried again', async () => {
+  const { pdfLinkFailure } = await import('./pdf-model');
+  const { AxiosError } = await import('axios');
+  const answered = (status: number) => new AxiosError('TEST DATA', String(status), undefined, undefined, { status } as never);
+  assert.deepEqual(pdfLinkFailure(answered(403)), { message: 'Opens for Space members only.', retry: false });
+  assert.deepEqual(pdfLinkFailure(answered(404)), { message: 'This file is no longer available.', retry: false });
+  assert.deepEqual(pdfLinkFailure(answered(500)), { message: 'The PDF did not load. Try again, or download it.', retry: true });
+  assert.deepEqual(pdfLinkFailure(new Error('TEST DATA offline')), { message: 'The PDF did not load. Try again, or download it.', retry: true });
+});

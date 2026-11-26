@@ -16,6 +16,7 @@ import {
   canvasRatio,
   pageScale,
   pdfFailure,
+  pdfLinkFailure,
   zoomIn,
   zoomLabel,
   zoomOut,
@@ -91,7 +92,10 @@ export function PdfReader({
     void link.refetch().finally(() => setAttempt((count) => count + 1));
   };
 
-  if (link.isError) return <>{fallback('The PDF did not load. Try again, or download it.', again)}</>;
+  if (link.isError) {
+    const failure = pdfLinkFailure(link.error);
+    return <>{fallback(failure.message, failure.retry ? again : null)}</>;
+  }
   if (url === null) {
     return (
       <div className={cn('flex min-h-full flex-col', className)}>
