@@ -84,6 +84,7 @@ export function PdfViewerDialog({ viewer }: { viewer: ShownPdf }) {
           key={file.id}
           fileId={file.id}
           name={file.name}
+          refusedMessage={file.refusedMessage}
           onPageCount={(count) => setCounted({ id: file.id, pages: count })}
           startPage={passage?.page ?? null}
           passage={passage?.quote ?? null}

@@ -163,6 +163,26 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // The admin conversation view's transcript is the one v2 module v1 code may import (above), and only its
+  // admin page may: any other importer would carry the v2 rows into another v1 bundle (review of 7ed967c8).
+  {
+    files: ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}"],
+    ignores: ["v2/**", "app/v2/**", "components/admin/conversations/AdminConversationScreen.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/v2/features/conversations/admin-view/*", "**/v2/features/conversations/admin-view/*"],
+              message:
+                "Only components/admin/conversations/AdminConversationScreen.tsx may import the admin conversation view's transcript.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

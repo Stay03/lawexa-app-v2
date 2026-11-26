@@ -106,13 +106,14 @@ export function pdfFailure(error: unknown): PdfFailure {
 
 /**
  * Why the reader could not get a link to the PDF (`GET /files/{id}/download`),
- * in the reader's own words, and whether Try again can help. A 403 is a Space's
- * file read by someone outside the Space (staff in the admin view included;
- * Backend, thread 085a980c) and a 404 a file that is gone: trying again cannot
- * help either.
+ * in the reader's own words, and whether Try again can help. A 403 is a file
+ * the reader may not open and a 404 a file that is gone: trying again cannot
+ * help either. The reader serves chats, channels and folders, so its own 403
+ * sentence names no place; an opener that knows why passes its own (a chat's
+ * file from a Space: "Opens for Space members only."; thread 085a980c).
  */
-export function pdfLinkFailure(error: unknown): { message: string; retry: boolean } {
-  if (isForbiddenError(error)) return { message: 'Opens for Space members only.', retry: false };
+export function pdfLinkFailure(error: unknown, refusedMessage?: string): { message: string; retry: boolean } {
+  if (isForbiddenError(error)) return { message: refusedMessage ?? 'You don’t have access to this file.', retry: false };
   if (isNotFoundError(error)) return { message: 'This file is no longer available.', retry: false };
   return { message: 'The PDF did not load. Try again, or download it.', retry: true };
 }

@@ -222,6 +222,8 @@ export function SentAttachments({
                           name: document.file_name,
                           mimeType: document.mime_type || 'application/pdf',
                           size: document.file_size,
+                          // A chat's file is refused only when it belongs to a Space the reader is not in.
+                          refusedMessage: SPACE_ONLY,
                         })
                     : null
                 }

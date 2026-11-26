@@ -1,3 +1,4 @@
+import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { AdminConversationOwner, AdminTurnAttribution, AdminViewMessage } from '@/types/admin-conversation-view';
 
 /**
@@ -27,6 +28,23 @@ export interface TurnFacts {
 /** The transcript row id `transformApiMessages` gives a server message. */
 export function rowIdOf(messageId: number): string {
   return `msg_${messageId}`;
+}
+
+/**
+ * The rows the transcript draws as answers, by row id: the plain assistant
+ * rows of the owner's transcript. A tool call, a handover, a failed turn's
+ * line, narration and the lines beside the turns (a background job's give-up,
+ * a draft's "edited") draw no answer, so a turn's line never anchors on them
+ * (review of 7ed967c8: a give-up line after the answer took the turn's line
+ * with it).
+ */
+export function answerRowIds(messages: readonly AdminViewMessage[]): Set<string> {
+  const rows = transformApiMessages([...messages], { events: true });
+  return new Set(
+    rows
+      .filter((row) => row.role === 'assistant' && !('messageType' in row && row.messageType))
+      .map((row) => row.id),
+  );
 }
 
 /**

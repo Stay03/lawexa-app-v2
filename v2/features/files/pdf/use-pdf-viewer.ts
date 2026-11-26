@@ -25,6 +25,12 @@ export interface PdfTarget {
   passages?: readonly PdfPassage[];
   /** Which of `passages` to open on (the one a link was for); the first when left out. */
   startPassage?: number;
+  /**
+   * What the reader says when the file is refused (403), where the opener
+   * knows why: a chat's file from a Space says "Opens for Space members only."
+   * Left out, the reader's own neutral sentence.
+   */
+  refusedMessage?: string;
 }
 
 export interface PdfViewer {

@@ -24,7 +24,7 @@ import { isNotFoundError } from '@/lib/utils/api-error';
 import type { AdminConversationView } from '@/types/admin-conversation-view';
 import type { AgentConversation } from '@/types/agent-conversations';
 import { AdminTranscript } from '@/v2/features/conversations/admin-view/AdminTranscript';
-import { callsLine, fundingLine, planLine, tokensLine, turnFactsByRow, type TurnFacts } from './admin-view-model';
+import { answerRowIds, callsLine, fundingLine, planLine, tokensLine, turnFactsByRow, type TurnFacts } from './admin-view-model';
 import { AdminRawMessages } from './AdminRawMessages';
 
 /**
@@ -137,10 +137,7 @@ function OwnerTranscript({
 }) {
   const showNGN = useCurrencyStore((s) => s.showNGN);
   const { rate: exchangeRate } = useExchangeRate();
-  const facts = useMemo(() => {
-    const answers = new Set(view.messages.filter((m) => m.role === 'assistant').map((m) => `msg_${m.id}`));
-    return turnFactsByRow(view.messages, answers);
-  }, [view.messages]);
+  const facts = useMemo(() => turnFactsByRow(view.messages, answerRowIds(view.messages)), [view.messages]);
   const turnFooter = useCallback(
     (rowId: string) => {
       const turn = facts.get(rowId);

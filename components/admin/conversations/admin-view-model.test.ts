@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { AdminTurnUsage, AdminViewMessage } from '../../../types/admin-conversation-view';
-import { callsLine, cutResults, fundingLine, planLine, rowIdOf, tokensLine, turnFactsByRow } from './admin-view-model';
+import { answerRowIds, callsLine, cutResults, fundingLine, planLine, rowIdOf, tokensLine, turnFactsByRow } from './admin-view-model';
 
 /* TEST DATA throughout. */
 
@@ -95,4 +95,17 @@ test('the plan line says the subscription state, or the plan alone', () => {
 test('cut tool results are found by their mark', () => {
   const messages = [row(1, 'tool', { metadata: { result_truncated: true } as never }), row(2, 'tool')];
   assert.deepEqual(cutResults(messages), [1]);
+});
+
+test('a turn’s line sits under its answer, never under a tool call or a line after the answer', () => {
+  const messages = [
+    row(1, 'user'),
+    row(2, 'assistant', { metadata: { type: 'tool_call', tool_name: 'search_cases', tool_parameters: {}, tool_call_id: 'c1', iteration: 1 } as never, usage: usage() }),
+    row(3, 'tool', { metadata: { tool_call_id: 'c1', tool_name: 'search_cases' } as never }),
+    row(4, 'assistant', { usage: usage() }),
+    row(5, 'assistant', { metadata: { type: 'background_job_unanswered' } as never }),
+  ];
+  const answers = answerRowIds(messages);
+  assert.deepEqual([...answers], ['msg_4']);
+  assert.deepEqual([...turnFactsByRow(messages, answers).keys()], ['msg_4']);
 });
