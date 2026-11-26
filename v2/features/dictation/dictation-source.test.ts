@@ -37,3 +37,11 @@ test('the voice goes up only where the chat keeps it', () => {
   // A document's first question starts a new chat, whose send takes no voice.
   assert.match(read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx'), /dictationKeepsVoice=\{surface !== null\}/);
 });
+
+test('a voice with no signed link says it can’t play, without loading anything', () => {
+  // Backend 469b2d45: voice_clip.url is null when the link could not be signed.
+  const line = read('v2', 'features', 'dictation', 'VoiceClipLine.tsx');
+  assert.match(line, /\{failed \|\| !clip\.url \? \(/);
+  assert.match(line, /src=\{clip\.url \?\? undefined\}/);
+  assert.match(read('types', 'dictation.ts'), /url: string \| null;/);
+});

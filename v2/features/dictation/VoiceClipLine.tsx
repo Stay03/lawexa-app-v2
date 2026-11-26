@@ -36,7 +36,7 @@ export function VoiceClipLine({ clip, align }: { clip: VoiceClip; align: 'start'
       <span aria-hidden>·</span>
       <span className="tabular-nums">{timerLabel(clip.duration_ms)}</span>
       <span aria-hidden>·</span>
-      {failed ? (
+      {failed || !clip.url ? (
         <span>The voice can’t play here</span>
       ) : (
         <button
@@ -51,7 +51,7 @@ export function VoiceClipLine({ clip, align }: { clip: VoiceClip; align: 'start'
       )}
       <audio
         ref={audioRef}
-        src={clip.url}
+        src={clip.url ?? undefined}
         preload="none"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}

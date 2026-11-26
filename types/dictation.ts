@@ -21,10 +21,14 @@ export interface DictationClipResponse {
   data: { id: number; duration_ms: number } | null;
 }
 
-/** A message's kept voice, as the message resource carries it. The url is signed and short-lived. */
+/**
+ * A message's kept voice, as the message resource carries it. The url is
+ * signed and short-lived; null when the server could not sign one (Backend
+ * 469b2d45), and the line then says the voice can't play.
+ */
 export interface VoiceClip {
   id: number;
-  url: string;
+  url: string | null;
   duration_ms: number;
 }
 
