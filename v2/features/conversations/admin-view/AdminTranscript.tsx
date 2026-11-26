@@ -38,7 +38,7 @@ import '@/v2/shell/shell.css';
  * a card, keep a file as a template or regenerate; `ReadOnlyTranscript` turns
  * off every other row that could act (a skill draft's Save and Dismiss, the
  * machine's Free it, a prompt card's choices, Connect with a lawyer, Try
- * again); background jobs show without Cancel; agent rows show without Stop
+ * again); background jobs show without Cancel (useCanAct); agent rows show without Stop
  * and follow no running turn.
  *
  * DRAWN AS THE OWNER. The rows ask the session who is reading ("mine", a
@@ -105,7 +105,7 @@ export function AdminTranscript({
           mayHaveWrapped={false}
           wrappedHidden
         >
-          <BackgroundJobsProvider conversationId={view.id} jobs={jobs} readOnly>
+          <BackgroundJobsProvider conversationId={view.id} jobs={jobs}>
             <AgentRowsProvider conversationId={view.id} agentConversations={readerAgents}>
               <TurnFooterProvider render={turnFooter}>
                 {/* Read in the admin page's own scroll, from the top (Stay, 26 November 2026). */}

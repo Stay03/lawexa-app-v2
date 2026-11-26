@@ -35,6 +35,7 @@ import { isPdfFile } from '@/v2/features/files/viewable';
 import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { isPictureAttachment } from '../../attachment-rules';
 import { useV2ChatContext } from '../chat-context';
+import { useCanAct } from '../read-only';
 import { isReading, readingAnnouncement, readingLine, readingPollDelay } from './reading-line';
 
 /**
@@ -417,9 +418,10 @@ function isTemplateFile(document: MessageAttachment): boolean {
  */
 function KeepAsTemplate({ document }: { document: MessageAttachment }) {
   const chat = useV2ChatContext();
+  const canAct = useCanAct();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
-  if (!chat?.conversationId) return null;
+  if (!canAct || !chat?.conversationId) return null;
   const conversationId = chat.conversationId;
   const keep = async () => {
     setSaving(true);

@@ -17,7 +17,7 @@ import type { SkillDraft, SkillDraftCard, SkillDraftStatus } from '@/types/skill
 import { privateItemsQueries } from '@/v2/features/private-items/queries';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2ChatContext } from '../chat-context';
-import { useReadOnlyTranscript } from '../read-only';
+import { useCanAct } from '../read-only';
 import { InstructionsDiff, InstructionsText } from './InstructionsDiff';
 
 /**
@@ -40,8 +40,8 @@ import { InstructionsDiff, InstructionsText } from './InstructionsDiff';
  */
 export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
   const chat = useV2ChatContext();
-  // Staff reading the person's chat see the choices, never press them (read-only.tsx).
-  const readOnly = useReadOnlyTranscript();
+  // Staff in the admin view, or a reader who may not send, see the choices and never press them (useCanAct).
+  const canAct = useCanAct();
   const [open, setOpen] = useState(false);
   const bodyId = useId();
 
@@ -133,7 +133,7 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
               <Button
                 type="button"
                 size="sm"
-                disabled={settle.isPending || chat?.canSend === false || readOnly}
+                disabled={settle.isPending || !canAct}
                 onClick={() => settle.mutate('mine')}
               >
                 {settle.isPending && settle.variables === 'mine' ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
@@ -144,7 +144,7 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
               type="button"
               size="sm"
               variant={canKeep ? 'secondary' : 'default'}
-              disabled={settle.isPending || chat?.canSend === false || readOnly}
+              disabled={settle.isPending || !canAct}
               onClick={() => settle.mutate('save')}
             >
               {settle.isPending && settle.variables === 'save' ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
@@ -154,7 +154,7 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
               type="button"
               size="sm"
               variant="secondary"
-              disabled={settle.isPending || chat?.canSend === false || readOnly}
+              disabled={settle.isPending || !canAct}
               onClick={() => settle.mutate('dismiss')}
             >
               Not now

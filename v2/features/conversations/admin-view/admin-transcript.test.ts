@@ -14,7 +14,8 @@ test('the admin transcript is read-only, follows no live turn, and keeps nothing
   const transcript = read('conversations', 'admin-view', 'AdminTranscript.tsx');
   assert.match(transcript, /<ReadOnlyTranscript>/);
   assert.match(transcript, /\(\{ \.\.\.agent, can_send: false, execution_id: null, stream_url: null \}\)/);
-  assert.match(transcript, /<BackgroundJobsProvider conversationId=\{view\.id\} jobs=\{jobs\} readOnly>/);
+  // The jobs show without Cancel: each label asks useCanAct, which ReadOnlyTranscript makes false (can-act.test.ts).
+  assert.match(transcript, /<BackgroundJobsProvider conversationId=\{view\.id\} jobs=\{jobs\}>/);
   // Its own query client, with v2's defaults and no persister.
   assert.match(transcript, /const \[queryClient\] = useState\(\(\) => makeQueryClient\(\)\);/);
   assert.doesNotMatch(transcript, /persister:|deviceCachePersister|V2QueryProvider/);
@@ -36,8 +37,8 @@ test('the admin transcript is read in the page from its top: no scroller, no lan
   assert.doesNotMatch(read('conversations', 'conversation', 'ConversationScreen.tsx'), /^\s+flow(=\{[^}]*\})?\s*\/?>?\s*$/m);
 });
 
-test('every row that can act reads the read-only signal', () => {
-  const uses = /const readOnly = useReadOnlyTranscript\(\);/;
+test('every row that can act asks useCanAct (the read-only signal is part of it)', () => {
+  const uses = /const canAct = useCanAct\(\);/;
   const actors: string[][] = [
     ['conversations', 'conversation', 'skill-draft', 'SkillDraftCard.tsx'],
     ['conversations', 'conversation', 'cards', 'NextQuestionPromptCard.tsx'],
@@ -50,10 +51,10 @@ test('every row that can act reads the read-only signal', () => {
   ];
   for (const parts of actors) assert.match(read(...parts), uses, parts.join('/'));
   // A skill draft's three choices are not pressable, the machine is not read, and the nudge is not shown.
-  assert.equal((read('conversations', 'conversation', 'skill-draft', 'SkillDraftCard.tsx').match(/chat\?\.canSend === false \|\| readOnly\}/g) ?? []).length, 3);
-  assert.match(read('userbox', 'MachineChatNotes.tsx'), /enabled: !readOnly/);
-  assert.match(read('conversations', 'conversation', 'cards', 'NextQuestionPromptCard.tsx'), /\{readOnly \? null : <NotificationNudge \/>\}/);
-  assert.match(read('conversations', 'conversation', 'rows', 'ErrorRow.tsx'), /message\.retryable && !readOnly &&/);
+  assert.equal((read('conversations', 'conversation', 'skill-draft', 'SkillDraftCard.tsx').match(/settle\.isPending \|\| !canAct\}/g) ?? []).length, 3);
+  assert.match(read('userbox', 'MachineChatNotes.tsx'), /enabled: canAct/);
+  assert.match(read('conversations', 'conversation', 'cards', 'NextQuestionPromptCard.tsx'), /\{canAct \? <NotificationNudge \/> : null\}/);
+  assert.match(read('conversations', 'conversation', 'rows', 'ErrorRow.tsx'), /message\.retryable && canAct &&/);
 });
 
 test('the chat page never sets it', () => {

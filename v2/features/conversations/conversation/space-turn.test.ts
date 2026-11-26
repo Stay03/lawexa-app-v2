@@ -421,15 +421,17 @@ test('a reader who may not send gets disabled card actions, and the screen sends
   for (const card of ['DeepResearchPromptCard', 'MultiQuestionPlanCard', 'MultiQuestionPromptCard', 'NextQuestionPromptCard']) {
     assert.match(
       readHere(join('cards', `${card}.tsx`)),
-      // …and inside a transcript drawn for staff (the admin view, read-only.tsx), never pressable either.
-      /disabled=\{clicked \|\| isInteracted \|\| chatContext\?\.isStreaming \|\| chatContext\?\.canSend === false \|\| readOnly\}/,
+      // useCanAct is false for a reader who may not send, and inside a transcript drawn for
+      // staff (the admin view); its rule is pinned in can-act.test.ts.
+      /disabled=\{clicked \|\| isInteracted \|\| chatContext\?\.isStreaming \|\| !canAct\}/,
       card,
     );
   }
   assert.match(
     readHere(join('cards', 'QuizCard.tsx')),
-    /disabled=\{!allAnswered \|\| !chatContext \|\| chatContext\.isStreaming \|\| !chatContext\.canSend\}/,
+    /disabled=\{!allAnswered \|\| !canAct \|\| !chatContext \|\| chatContext\.isStreaming\}/,
   );
+  assert.match(readHere('read-only.tsx'), /return !readOnly && chat !== null && chat\.canSend;/);
 });
 
 test('a refused follow-up (409 or 403) comes back to the composer with the composer’s own sentence', () => {

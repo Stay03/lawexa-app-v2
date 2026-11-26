@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { userBoxApi } from '@/lib/api/user-box';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useV2ChatContext } from '@/v2/features/conversations/conversation/chat-context';
-import { useReadOnlyTranscript } from '@/v2/features/conversations/conversation/read-only';
+import { useCanAct } from '@/v2/features/conversations/conversation/read-only';
 import { useSidePanel } from '@/v2/features/conversations/conversation/side-panel/SidePanelContext';
 import { useV2Session } from '@/v2/runtime/session-context';
 import {
@@ -41,10 +41,10 @@ export function MachineInUseCard({ holder }: { holder: { conversation_uuid: stri
   const queryClient = useQueryClient();
   const session = useV2Session();
   const chat = useV2ChatContext();
-  // Staff reading the person's chat (read-only.tsx): the person's line as they saw it, with nothing to press;
-  // the machine read here would be the staff member's own, and "Free it" would free theirs.
-  const readOnly = useReadOnlyTranscript();
-  const box = useQuery({ ...userBoxQueries.status({ viewerId: session.userId }), enabled: !readOnly }).data ?? null;
+  // Staff reading the person's chat, or a reader who may not send (useCanAct): the line as the person saw it,
+  // with nothing to press. For staff the machine read here would be their own, and "Free it" would free theirs.
+  const canAct = useCanAct();
+  const box = useQuery({ ...userBoxQueries.status({ viewerId: session.userId }), enabled: canAct }).data ?? null;
   const [carriedOn, setCarriedOn] = useState(false);
   const release = useMutation({
     mutationFn: () => userBoxApi.release(chat?.conversationId),
@@ -69,7 +69,7 @@ export function MachineInUseCard({ holder }: { holder: { conversation_uuid: stri
     },
     meta: { silentError: true },
   });
-  if (readOnly) {
+  if (!canAct) {
     return (
       <p className="mt-3 flex max-w-xl items-start gap-2 text-sm text-muted-foreground">
         <Monitor aria-hidden className="mt-0.5 size-4 shrink-0" />
