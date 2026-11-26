@@ -324,3 +324,20 @@ test('no "Ask again" while the chain is open: a new turn then would run beside t
   assert.ok(controller.indexOf('const agentChain = ') < controller.indexOf('const chainOpen = '));
   assert.match(here('rows', 'AssistantMessageRow.tsx'), /showRegenerate=\{isLast && canRegenerate\}/);
 });
+
+test('the deck wears the chat’s own plain look: colour only in the state mark (Stay, 26 November 2026: "too vibe coded")', () => {
+  const deck = here('agents', 'AgentRoster.tsx');
+  // No tinted cards, coloured rings or glows, and no tinted helper slips.
+  for (const tint of [/bg-emerald-\d/, /bg-amber-\d/, /bg-primary\b(?!\/)/, /ring-emerald/, /ring-primary/, /shadow-\[/, /dark:bg-emerald/]) {
+    assert.doesNotMatch(deck, tint, String(tint));
+  }
+  // A card is the draft card's surface; a face is the step marker's neutral disc.
+  assert.match(deck, /className="flex flex-col rounded-2xl border border-border bg-card/);
+  assert.match(deck, /'flex shrink-0 items-center justify-center rounded-full bg-secondary font-semibold text-muted-foreground'/);
+  // Helpers are rows under a left rule, as a lookup sits under its step.
+  assert.match(deck, /<ul aria-label="Helpers" className="mb-2\.5 ml-\[29px\] mr-3 flex flex-col gap-0\.5 border-l border-border pl-3">/);
+  // The one mark of colour: working, done, failed.
+  assert.match(deck, /if \(tone === 'working'\) return <Loader2 aria-hidden className="size-3 shrink-0 text-primary motion-safe:animate-spin" \/>;/);
+  assert.match(deck, /if \(tone === 'done'\) return <Check aria-hidden strokeWidth=\{2\.5\} className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" \/>;/);
+  assert.match(deck, /if \(tone === 'failed'\) return <CircleAlert aria-hidden className="size-3 shrink-0 text-destructive" \/>;/);
+});
