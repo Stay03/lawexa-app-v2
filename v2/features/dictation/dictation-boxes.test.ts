@@ -88,3 +88,12 @@ test('no box grows past its cap, and the cap follows the screen height', () => {
   // The typed box's height is written by its autosize, capped at maxHeight (prompt-input.tsx).
   assert.match(read('components', 'ui', 'prompt-input.tsx'), /el\.style\.height = `min\(\$\{el\.scrollHeight\}px, \$\{maxHeight\}\)`/);
 });
+
+test('Pause never opens the phone keyboard: the paused words take the focus only when tapped (Arthur, 26 November 2026)', () => {
+  const panel = read('v2', 'features', 'dictation', 'DictationPanel.tsx');
+  const paused = panel.slice(panel.indexOf('<textarea'), panel.indexOf('/>', panel.indexOf('<textarea')));
+  assert.ok(paused.length > 0);
+  // The attribute, not the comment that explains why it is gone.
+  assert.doesNotMatch(paused, /^\s*autoFocus(=\{[^}]*\})?\s*$/m);
+  assert.doesNotMatch(panel, /\.focus\(/);
+});

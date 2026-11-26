@@ -56,7 +56,8 @@ export function DictationPanel({
           value={state.text}
           onChange={(event) => dictation.setText(event.target.value)}
           rows={2}
-          autoFocus
+          // No autoFocus: on a phone it opened the keyboard on Pause (Arthur, 26 November 2026). The words are
+          // edited when the reader taps them.
           className="text-foreground max-h-[min(150px,30dvh)] min-h-12 w-full resize-none bg-transparent px-3 pt-2 pb-1 text-base leading-relaxed [field-sizing:content] [overflow-wrap:anywhere] focus:outline-none md:text-[15px]"
         />
       ) : (
