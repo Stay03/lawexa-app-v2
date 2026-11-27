@@ -123,4 +123,6 @@ test('the mic stays with attachments: beside Send when only files are there', ()
   assert.equal(dictateOffer(false, false, '', 2), null);
   const panel = read('v2', 'features', 'dictation', 'DictationPanel.tsx');
   assert.match(panel, /\{onAttach \? \(\s*<button type="button" aria-label="Attach files" onClick=\{onAttach\}/);
+  // + stays first, where it sits in the box, and X follows it (Arthur, 27 November 2026).
+  assert.ok(panel.indexOf('aria-label="Attach files"') < panel.indexOf('aria-label="Cancel dictation"'), '+ before X');
 });

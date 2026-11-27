@@ -82,14 +82,15 @@ export function DictationPanel({
       )}
 
       <div className="flex min-w-0 items-center gap-2 pt-1">
-        <button type="button" aria-label="Cancel dictation" onClick={() => void dictation.cancel()} className={cn(ROUND, 'bg-secondary text-foreground hover:bg-secondary/80')}>
-          <X aria-hidden className="size-4" />
-        </button>
+        {/* + stays first, where it sits in the box (Arthur, 27 November 2026), and X follows it. */}
         {onAttach ? (
           <button type="button" aria-label="Attach files" onClick={onAttach} disabled={isSending} className={cn(ROUND, 'text-primary hover:bg-secondary')}>
             <Plus aria-hidden className="size-4" />
           </button>
         ) : null}
+        <button type="button" aria-label="Cancel dictation" onClick={() => void dictation.cancel()} className={cn(ROUND, 'bg-secondary text-foreground hover:bg-secondary/80')}>
+          <X aria-hidden className="size-4" />
+        </button>
 
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span
