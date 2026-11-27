@@ -2,7 +2,7 @@ import { dictationApi } from '@/lib/api/dictation';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { RecordingLiveConfig } from '@/types/recording';
 import { DICTATION_MAX_MS } from '@/types/dictation';
-import { ElevenLabsLiveSession } from '../recording/elevenlabs-live';
+import { ElevenLabsLiveSession, LIVE_QUEUE_MAX } from '../recording/elevenlabs-live';
 import { micProblem, pickAudioMime, type StartProblem } from '../recording/recording-model';
 import { applySegment, hasWords, SEND_UNDO_MS, type DictationPhase } from './dictation-model';
 import { playEndBeep, playStartBeep } from './dictation-sounds';
@@ -93,6 +93,8 @@ export class DictationController {
   private pausedTotal = 0;
   private pausedAt = 0;
   private committedCount = 0;
+  /** Audio taken before the first live session existed (the token was on its way). */
+  private early: ArrayBuffer[] = [];
 
   /** The box's latest handlers, set after each render (never during one). */
   connect = (handlers: DictationHandlers) => {
@@ -113,7 +115,16 @@ export class DictationController {
   }
 
   // ── What the person does ───────────────────────────────────────────────
-  /** One click: the microphone, the token, the live words and the voice. */
+  /**
+   * One click: the microphone, the voice and the live words. The token is
+   * asked for at the tap, beside the microphone, so a refusal (no access, the
+   * day's allowance used up) shows before any beep. Audio is taken from the
+   * moment the microphone opens; the start beep and the listening state come
+   * once that and the token are ready, so the beep means "speak now". The live
+   * socket then opens while the person speaks, and what they said in the
+   * meantime goes first (elevenlabs-live), so no first word is lost (Lucy's
+   * rehearsal, 27 November 2026: "Lawexa, file…" arrived as "File…").
+   */
   start = async () => {
     if (this.state.phase !== 'idle' && this.state.phase !== 'problem') return;
     this.set({ ...IDLE, phase: 'starting' });
@@ -121,20 +132,18 @@ export class DictationController {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return this.fail('unsupported');
     const mime = pickAudioMime((type) => MediaRecorder.isTypeSupported(type));
     if (!mime) return this.fail('unsupported');
+    const token = dictationApi.liveToken().then((answer) => {
+      if (!answer.data) throw new Error(answer.message);
+      return answer.data.live;
+    });
+    // Read below, after the microphone; this only keeps an early refusal from going unhandled.
+    token.catch(() => {});
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
     } catch (error) {
       return this.fail(micProblem(error));
     }
-    let live: RecordingLiveConfig;
-    try {
-      const answer = await dictationApi.liveToken();
-      if (!answer.data) throw new Error(answer.message);
-      live = answer.data.live;
-    } catch (error) {
-      const { status, message } = extractApiError(error);
-      return this.fail(status === 403 ? 'no_access' : 'server', message);
-    }
+    if (this.startCalledOff()) return this.releaseMedia();
 
     this.pieces = [];
     this.recorder = new MediaRecorder(this.stream, { mimeType: mime });
@@ -145,11 +154,28 @@ export class DictationController {
     this.startedAt = performance.now();
     this.pausedTotal = 0;
     this.committedCount = 0;
-    await this.startLiveWords(live);
+    await this.startCapture();
+
+    let live: RecordingLiveConfig;
+    try {
+      live = await token;
+    } catch (error) {
+      if (this.startCalledOff()) return;
+      void this.stopRecorder();
+      const { status, message } = extractApiError(error);
+      return this.fail(status === 403 ? 'no_access' : 'server', message);
+    }
+    if (this.startCalledOff()) return;
     this.ticker = setInterval(() => this.tick(), 250);
     playStartBeep();
     this.set({ phase: 'listening', elapsedMs: 0 });
+    if (!this.state.liveDown) this.openLive(live);
   };
+
+  /** The person cancelled (or the box went away) while the start was on its way. */
+  private startCalledOff(): boolean {
+    return this.state.phase !== 'starting';
+  }
 
   /** Pause (also from the Undo wait: the spoken send is called off). */
   pause = () => {
@@ -245,19 +271,24 @@ export class DictationController {
     this.set({ elapsedMs });
   }
 
-  private async startLiveWords(config: RecordingLiveConfig) {
+  /** The microphone as 16 kHz PCM, kept in {@link early} until the live session exists. */
+  private async startCapture() {
     if (!this.stream) return;
+    this.early = [];
     try {
       this.audio = new AudioContext();
       await this.audio.audioWorklet.addModule('/recording/pcm-worklet.js');
       this.worklet = new AudioWorkletNode(this.audio, 'lawexa-pcm');
       this.worklet.port.onmessage = (event: MessageEvent<{ pcm: ArrayBuffer; level: number }>) => {
-        this.live?.send(event.data.pcm);
+        if (this.live) this.live.send(event.data.pcm);
+        else {
+          this.early.push(event.data.pcm);
+          if (this.early.length > LIVE_QUEUE_MAX) this.early.shift();
+        }
         const level = this.state.phase === 'listening' || this.state.phase === 'countdown' ? Math.min(1, event.data.level * 4) : 0;
         this.set({ levels: [...this.state.levels, level].slice(-LEVEL_HISTORY) });
       };
       this.audio.createMediaStreamSource(this.stream).connect(this.worklet);
-      this.openLive(config);
     } catch {
       // No live words on this browser: the voice is still kept, and the words can be typed.
       this.set({ liveDown: true });
@@ -266,7 +297,7 @@ export class DictationController {
 
   private openLive(config: RecordingLiveConfig) {
     this.live?.close();
-    this.live = new ElevenLabsLiveSession(
+    const session = new ElevenLabsLiveSession(
       {
         onMessage: (message) => {
           if (message.kind === 'event') this.onLiveEvent(message.event);
@@ -278,7 +309,11 @@ export class DictationController {
       () => this.heardMs() / 1000,
       () => this.committedCount,
     );
-    this.live.open(config, false);
+    session.open(config, false);
+    // What was said before the token came goes first, then the audio as it comes.
+    for (const pcm of this.early) session.send(pcm);
+    this.early = [];
+    this.live = session;
   }
 
   private onLiveEvent(event: { kind: string; text?: string }) {
@@ -339,6 +374,8 @@ export class DictationController {
   }
 
   private releaseMedia() {
+    this.early = [];
+    this.live = null;
     if (this.ticker) clearInterval(this.ticker);
     this.ticker = null;
     this.worklet?.disconnect();

@@ -36,11 +36,17 @@ test('every message box offers Dictate, from the one button, behind can_dictate'
     assert.match(box, /import \{ DictateButton \} from '@\/v2\/features\/dictation\/DictateButton';/, where);
     assert.match(box, /<DictateButton\b/, where);
     assert.match(box, /useDictation\(\{/, where);
-    assert.match(box, /<DictationPanel state=\{dictating\} dictation=\{dictation\}/, where);
+    assert.match(box, /<DictationPanel\s+state=\{dictating\}\s+dictation=\{dictation\}/, where);
     assert.match(box, /<DictationCountdown state=\{dictating\} dictation=\{dictation\} \/>/, where);
     assert.match(box, /<DictationHint state=\{dictating\} \/>/, where);
     // The gate: the session's can_dictate, in the line that offers it.
-    assert.match(box, /const offerDictate =\s*[\s\S]{0,40}\b(canDictate|dictable)\b/, where);
+    assert.match(box, /const dictatePlace = dictateOffer\([\s\S]{0,30}\b(canDictate|dictable)\b/, where);
+    assert.match(box, /const offerDictate = dictatePlace === 'instead';/, where);
+    // A box that takes files: with only files attached the mic sits beside Send,
+    // and files can be added while dictating or paused.
+    if (where === 'the agent panel') continue;
+    assert.match(box, /\{dictatePlace === 'beside'[\s\S]{0,160}<DictateButton/, where);
+    assert.match(box, /onAttach=\{\(\) => fileInputRef\.current\?\.click\(\)\}/, where);
   }
   // The channel box asks where the reader may post.
   assert.match(read(...BOXES['Space channels and task threads']), /const dictable = canDictate && channel\.can_post !== false;/);

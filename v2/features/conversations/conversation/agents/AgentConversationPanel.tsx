@@ -31,7 +31,7 @@ import { useAgentStream } from './use-agent-stream';
 import { sendsOnEnter } from '@/lib/utils/enter-key';
 import { DictateButton } from '@/v2/features/dictation/DictateButton';
 import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
-import { dictationProblemLine, joinText } from '@/v2/features/dictation/dictation-model';
+import { dictateOffer, dictationProblemLine, joinText } from '@/v2/features/dictation/dictation-model';
 import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
 
 /**
@@ -302,7 +302,9 @@ function AgentComposer({ conversation, running, onSent }: { conversation: AgentC
   });
   const dictationOpen = isDictating(dictating);
   // Dictate holds Send's place while the box is empty and no turn runs.
-  const offerDictate = canDictate && !dictationOpen && !running && text.trim() === '';
+  // This box takes no files, so Dictate only ever holds Send's place.
+  const dictatePlace = dictateOffer(canDictate && !running, dictationOpen, text, 0);
+  const offerDictate = dictatePlace === 'instead';
 
   // The app's one Enter rule (lib/utils/enter-key.ts): on a phone, return adds a line and the send button sends.
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {

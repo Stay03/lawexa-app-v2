@@ -14,6 +14,23 @@ import { readCommand, type DictationCommand } from './commands';
 
 export type DictationPhase = 'idle' | 'starting' | 'listening' | 'paused' | 'countdown' | 'problem';
 
+/**
+ * Where a message box offers Dictate. In Send's place while the box is empty;
+ * beside Send when files are attached and nothing is typed, so a file and a
+ * spoken prompt go in one message (Lucy's rehearsal, 27 November 2026: the
+ * mic went away once a file was attached). Never while dictating or once
+ * words are typed.
+ */
+export function dictateOffer(
+  canDictate: boolean,
+  dictating: boolean,
+  typed: string,
+  attached: number,
+): 'instead' | 'beside' | null {
+  if (!canDictate || dictating || typed.trim() !== '') return null;
+  return attached > 0 ? 'beside' : 'instead';
+}
+
 /** How long a spoken "send" waits for Undo (Arthur's choice, 14:31Z). */
 export const SEND_UNDO_MS = 2_000;
 

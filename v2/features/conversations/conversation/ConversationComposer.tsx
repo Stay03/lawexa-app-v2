@@ -67,7 +67,7 @@ import { useRecorder } from '@/v2/features/recording/use-recorder';
 import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
 import { DictateButton } from '@/v2/features/dictation/DictateButton';
 import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
-import { dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
+import { dictateOffer, dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
 import type { DictationResult } from '@/v2/features/dictation/dictation-controller';
 import { dictationApi } from '@/lib/api/dictation';
 import type { VoiceClip } from '@/types/dictation';
@@ -683,9 +683,14 @@ export function ConversationComposer({
     onProblem: (kind, message) => showError(dictationProblemLine(kind, message)),
   });
   const dictationOpen = isDictating(dictating);
-  // Dictate holds Send's place while the box is empty; Send takes it back once there is something to send.
-  const offerDictate =
-    canDictate && !dictationOpen && input.trim() === '' && uploads.length === 0 && pastedItems.length === 0;
+  // Dictate holds Send's place while the box is empty, and sits beside Send when only files are attached.
+  const dictatePlace = dictateOffer(canDictate, dictationOpen, input, uploads.length + pastedItems.length);
+  const offerDictate = dictatePlace === 'instead';
+  const startDictation = () => {
+    if (errorOpen) hideError();
+    onEngage?.();
+    void dictation.start();
+  };
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
@@ -1036,7 +1041,13 @@ export function ConversationComposer({
           joinedAbove={joinedAbove}
         >
           {dictationOpen ? (
-            <DictationPanel state={dictating} dictation={dictation} canSend={!sendHeld} isSending={isSubmitting} />
+            <DictationPanel
+              state={dictating}
+              dictation={dictation}
+              canSend={!sendHeld}
+              isSending={isSubmitting}
+              onAttach={() => fileInputRef.current?.click()}
+            />
           ) : (
             /* ── The single input row: + menu | textarea | Dictate/Send/Stop. ── */
             <div className="flex items-end gap-1.5">
@@ -1146,6 +1157,12 @@ export function ConversationComposer({
                 </PromptInputAction>
               ) : null}
 
+              {dictatePlace === 'beside' && !(isStreaming && canStop) ? (
+                <PromptInputAction tooltip="Dictate">
+                  <DictateButton onStart={startDictation} disabled={isSubmitting || disabled} />
+                </PromptInputAction>
+              ) : null}
+
               {isStreaming && canStop ? (
                 <PromptInputAction tooltip={isCancelling ? 'Cancelling' : 'Stop generating'}>
                   <Button
@@ -1166,14 +1183,7 @@ export function ConversationComposer({
                 </PromptInputAction>
               ) : offerDictate ? (
                 <PromptInputAction tooltip="Dictate">
-                  <DictateButton
-                    onStart={() => {
-                      if (errorOpen) hideError();
-                      onEngage?.();
-                      void dictation.start();
-                    }}
-                    disabled={isSubmitting || disabled}
-                  />
+                  <DictateButton onStart={startDictation} disabled={isSubmitting || disabled} />
                 </PromptInputAction>
               ) : (
                 // While a turn runs that this reader may not stop (a colleague's,

@@ -67,7 +67,7 @@ import { useHeldValue } from '../use-held-value';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { DictateButton } from '@/v2/features/dictation/DictateButton';
 import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
-import { dictationProblemLine, joinText } from '@/v2/features/dictation/dictation-model';
+import { dictateOffer, dictationProblemLine, joinText } from '@/v2/features/dictation/dictation-model';
 import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
 import {
   ChatComposerShell,
@@ -1360,8 +1360,9 @@ function ChannelComposerBody({
     onProblem: (kind, message) => setNotice(dictationProblemLine(kind, message)),
   });
   const dictationOpen = isDictating(dictating);
-  // Dictate holds Send's place while the box is empty; Send takes it back once there is something to send.
-  const offerDictate = dictable && !dictationOpen && value.trim() === '' && staged.length === 0 && uploading.length === 0;
+  // Dictate holds Send's place while the box is empty, and sits beside Send when only files are attached.
+  const dictatePlace = dictateOffer(dictable, dictationOpen, value, staged.length + uploading.length);
+  const offerDictate = dictatePlace === 'instead';
 
   const handleSend = () => sendText(value);
 
@@ -1886,6 +1887,7 @@ function ChannelComposerBody({
               </span>
             )}
 
+            {dictatePlace === 'beside' ? <DictateButton onStart={() => void dictation.start()} /> : null}
             {offerDictate ? (
               <DictateButton onStart={() => void dictation.start()} />
             ) : (
@@ -1906,7 +1908,13 @@ function ChannelComposerBody({
       }
     >
       {dictationOpen ? (
-        <DictationPanel state={dictating} dictation={dictation} canSend={uploading.length === 0 && !restoreChecking} isSending={false} />
+        <DictationPanel
+          state={dictating}
+          dictation={dictation}
+          canSend={uploading.length === 0 && !restoreChecking}
+          isSending={false}
+          onAttach={() => fileInputRef.current?.click()}
+        />
       ) : (
         <textarea
           ref={textareaRef}

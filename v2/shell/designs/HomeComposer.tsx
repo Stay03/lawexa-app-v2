@@ -48,7 +48,7 @@ import { dictationApi } from '@/lib/api/dictation';
 import { DictateButton } from '@/v2/features/dictation/DictateButton';
 import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
 import type { DictationResult } from '@/v2/features/dictation/dictation-controller';
-import { dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
+import { dictateOffer, dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
 import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
 import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { extractApiError, extractBlockedReason, extractUploadLimit } from '@/lib/utils/api-error';
@@ -602,8 +602,13 @@ export function HomeComposer({
     onProblem: (kind, message) => setError(dictationProblemLine(kind, message)),
   });
   const dictationOpen = isDictating(dictating);
-  // Dictate holds Send's place while the box is empty; Send takes it back once there is something to send.
-  const offerDictate = signedIn && canDictate && !dictationOpen && value.trim() === '' && uploads.length === 0;
+  // Dictate holds Send's place while the box is empty, and sits beside Send when only files are attached.
+  const dictatePlace = dictateOffer(signedIn && canDictate, dictationOpen, value, uploads.length);
+  const offerDictate = dictatePlace === 'instead';
+  const startDictation = () => {
+    if (error) setError(null);
+    void dictation.start();
+  };
 
   // Keep clicks inside portaled menus from bubbling to PromptInput's root (see
   // the PORTAL-EVENT NOTE above).
@@ -799,7 +804,13 @@ export function HomeComposer({
 
           {dictationOpen ? (
             <div className="px-1 pt-1 pb-1">
-              <DictationPanel state={dictating} dictation={dictation} canSend={!sendHeld} isSending={isSubmitting} />
+              <DictationPanel
+                state={dictating}
+                dictation={dictation}
+                canSend={!sendHeld}
+                isSending={isSubmitting}
+                onAttach={() => fileInputRef.current?.click()}
+              />
             </div>
           ) : (
             <>
@@ -917,17 +928,17 @@ export function HomeComposer({
                   <span className="flex-1" />
                 )}
 
+                {/* Beside Send when only files are attached. */}
+                {dictatePlace === 'beside' ? (
+                  <PromptInputAction tooltip="Dictate">
+                    <DictateButton onStart={startDictation} disabled={isSubmitting} className="size-11" />
+                  </PromptInputAction>
+                ) : null}
+
                 {/* Dictate holds Send's place while the box is empty (≥44px, as Send). */}
                 {offerDictate ? (
                   <PromptInputAction tooltip="Dictate">
-                    <DictateButton
-                      onStart={() => {
-                        if (error) setError(null);
-                        void dictation.start();
-                      }}
-                      disabled={isSubmitting}
-                      className="size-11"
-                    />
+                    <DictateButton onStart={startDictation} disabled={isSubmitting} className="size-11" />
                   </PromptInputAction>
                 ) : (
                   /* Send — the primary action. ≥44px on mobile; spins while creating. */

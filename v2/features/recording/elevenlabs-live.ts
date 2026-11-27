@@ -145,10 +145,15 @@ export interface LiveTranscriberHandlers {
   onDropped: () => void;
 }
 
+/** The most audio a session keeps while its socket opens: 10 seconds of quarter-second pieces. */
+export const LIVE_QUEUE_MAX = 40;
+
 /** One live session: open, send audio, finish. A fresh one replaces it after a drop. */
 export class ElevenLabsLiveSession {
   private socket: WebSocket | null = null;
   private finishing = false;
+  /** Audio heard before the socket opened, oldest first; sent the moment it opens. */
+  private queue: ArrayBuffer[] = [];
   private readonly handlers: LiveTranscriberHandlers;
   private readonly clock: () => number;
   private committed: () => number;
@@ -161,6 +166,11 @@ export class ElevenLabsLiveSession {
 
   open(config: RecordingLiveConfig, speakerLabels: boolean): void {
     const socket = new WebSocket(liveSocketUrl(config, { speakerLabels }));
+    socket.onopen = () => {
+      if (this.socket !== socket) return;
+      for (const pcm of this.queue) socket.send(audioMessage(pcm));
+      this.queue = [];
+    };
     socket.onmessage = (message) => {
       if (typeof message.data !== 'string') return;
       this.handlers.onMessage(parseLiveMessage(message.data, this.clock(), this.committed()));
@@ -172,9 +182,19 @@ export class ElevenLabsLiveSession {
     this.socket = socket;
   }
 
-  /** Send a quarter second of audio; dropped while the socket is not open (the saved audio still has it). */
+  /**
+   * Send a quarter second of audio. While the socket is still opening it waits
+   * in order and goes first once it opens, so the first words spoken after the
+   * tap reach the transcriber (Lucy's rehearsal, 27 November 2026: "Lawexa,
+   * file…" arrived as "File…"). Kept to {@link LIVE_QUEUE_MAX}, oldest first out.
+   */
   send(pcm: ArrayBuffer): void {
-    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(audioMessage(pcm));
+    const socket = this.socket;
+    if (socket?.readyState === WebSocket.OPEN) socket.send(audioMessage(pcm));
+    else if (!socket || socket.readyState === WebSocket.CONNECTING) {
+      this.queue.push(pcm);
+      if (this.queue.length > LIVE_QUEUE_MAX) this.queue.shift();
+    }
   }
 
   /** End the session: commit what was heard, let the last text arrive, then close. */
@@ -189,6 +209,7 @@ export class ElevenLabsLiveSession {
   /** Close at once (the page is leaving). */
   close(): void {
     this.finishing = true;
+    this.queue = [];
     this.socket?.close();
     this.socket = null;
   }

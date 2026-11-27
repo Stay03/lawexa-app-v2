@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { ArrowUp, Loader2, Mic, Pause, X } from 'lucide-react';
+import { ArrowUp, Loader2, Mic, Pause, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DictationController, DictationState } from './dictation-controller';
 import { dictationHint, SEND_UNDO_MS, timerLabel } from './dictation-model';
@@ -24,6 +24,7 @@ export function DictationPanel({
   dictation,
   canSend,
   isSending,
+  onAttach,
 }: {
   state: DictationState;
   dictation: DictationController;
@@ -31,6 +32,8 @@ export function DictationPanel({
   canSend: boolean;
   /** The words and the voice are on their way. */
   isSending: boolean;
+  /** Opens the box's file picker: files can be added while listening or paused. */
+  onAttach?: () => void;
 }) {
   const wordsRef = useRef<HTMLDivElement>(null);
   const paused = state.phase === 'paused';
@@ -82,6 +85,11 @@ export function DictationPanel({
         <button type="button" aria-label="Cancel dictation" onClick={() => void dictation.cancel()} className={cn(ROUND, 'bg-secondary text-foreground hover:bg-secondary/80')}>
           <X aria-hidden className="size-4" />
         </button>
+        {onAttach ? (
+          <button type="button" aria-label="Attach files" onClick={onAttach} disabled={isSending} className={cn(ROUND, 'text-primary hover:bg-secondary')}>
+            <Plus aria-hidden className="size-4" />
+          </button>
+        ) : null}
 
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span
