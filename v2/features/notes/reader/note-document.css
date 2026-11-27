@@ -327,3 +327,14 @@
     opacity: 0;
   }
 }
+
+/* ── A guest's cut of someone else's note (server guest-locks) ──────────── */
+
+/**
+ * The cut fades out over its last lines into the offer. A mask, so the fade
+ * works on either theme's ground; the case page's guest fade does the same.
+ */
+.v2-note-doc .v2-note-locked {
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+}

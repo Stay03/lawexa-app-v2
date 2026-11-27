@@ -69,9 +69,11 @@ export function useNoteExport(slug: string): {
     } catch (error) {
       const status = (error as { response?: { status?: number } } | null)?.response
         ?.status;
+      // A guest exporting someone else's note: the server says to sign in.
+      const said = await refusalMessage(error);
       toast.error(
         status === 403
-          ? "You don't have access to export this note."
+          ? said ?? "You don't have access to export this note."
           : "Couldn't export this note. Please try again.",
       );
     } finally {
@@ -80,4 +82,20 @@ export function useNoteExport(slug: string): {
   };
 
   return { download, exporting };
+}
+
+/**
+ * The server's sentence on a refused export. The export asks for a file, so
+ * an error body arrives as a Blob and is read as JSON here.
+ */
+async function refusalMessage(error: unknown): Promise<string | null> {
+  const data = (error as { response?: { data?: unknown } } | null)?.response?.data;
+  try {
+    const body: unknown =
+      typeof Blob !== 'undefined' && data instanceof Blob ? JSON.parse(await data.text()) : data;
+    const message = (body as { message?: unknown } | null)?.message;
+    return typeof message === 'string' && message.trim() ? message : null;
+  } catch {
+    return null;
+  }
 }

@@ -60,6 +60,7 @@ function recordingNotices() {
     loading: () => 't1',
     success: () => undefined,
     error: (message, options) => errors.push({ message, options }),
+    dismiss: () => undefined,
   };
   return { notices, errors };
 }

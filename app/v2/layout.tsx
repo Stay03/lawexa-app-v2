@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { HydrationBoundary } from '@tanstack/react-query';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { V2QueryProvider } from '@/v2/runtime/query-provider';
+import { AccountRequiredDialog } from '@/v2/shell/AccountRequiredDialog';
 import { V2CacheIdentityGuard } from '@/v2/runtime/cache-identity-guard';
 import { PlanCacheWatch } from '@/v2/features/subscription/PlanCacheWatch';
 import { ChannelDeviceSweep } from '@/v2/features/channels/device-sweep';
@@ -252,6 +253,10 @@ export default async function V2Layout({
             never opening a channel at all, kept A's words on the disk for the
             whole session. See the module for the render/effect split. */}
         <ChannelDeviceSweep userId={user?.id ?? null} />
+        {/* The sign-up prompt for a guest's refused action (an upload, a
+            publish, a new note, organisation or invite): one dialog, opened by
+            the API client whenever the server answers `account_required`. */}
+        <AccountRequiredDialog />
         {/* Publishes the ALREADY-COMPUTED session to the v2 client tree, so pages and
             screens read the server-verified identity from context instead of each
             awaiting `/auth/me` themselves. Because this layout is preserved across soft

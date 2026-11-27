@@ -38,11 +38,13 @@ import { CaseText, caseTextParagraphs } from './case-text';
 import type { OutlineSection } from './CaseOutline';
 import { SectionHeading } from './SectionHeading';
 import {
+  caseEndsAtTheOffer,
+  caseLockReader,
   fullReportAction,
-  guestEndsAtTheOffer,
-  guestFadesPrinciples,
   guestPrinciplesSource,
   hasPrinciples,
+  lockedReportPrinciple,
+  principlesFadeIntoOffer,
 } from './guest-fade';
 import { GuestOffer, ViewLimitNotice } from './states';
 import './case-masthead.css';
@@ -106,8 +108,8 @@ export function buildCaseOutline(
   detail: CaseDetail,
   role: string | null | undefined,
 ): OutlineSection[] {
-  // A guest's page is one block and the offer: there is nothing to map.
-  if (guestEndsAtTheOffer(detail, role)) return [];
+  // A locked page is one block and the offer: there is nothing to map.
+  if (caseEndsAtTheOffer(detail, role)) return [];
   const sections: OutlineSection[] = [];
   if (hasPrinciples(detail)) sections.push({ id: SECTION.principles, label: 'Principles' });
   sections.push({ id: SECTION.summary, label: 'Summary' });
@@ -138,12 +140,12 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   const raw = detail.display_title || detail.title;
   const name = formatCaseName(raw);
   const isLimited = detail.limit_exceeded === true;
-  // A guest's case comes without its summary: the notice offers an account.
+  // A locked case comes without its summary: the offer takes its place.
   const role = useV2Session().role;
-  const guest = role === 'guest';
-  const guestFade = guestFadesPrinciples(detail, role);
+  const lockReader = caseLockReader(detail, role);
+  const guestFade = principlesFadeIntoOffer(detail, role);
   const guestSource = guestFade ? guestPrinciplesSource(detail) : null;
-  const guestEndsAtOffer = guestEndsAtTheOffer(detail, role);
+  const guestEndsAtOffer = caseEndsAtTheOffer(detail, role);
   const countryCode = toAlpha2(detail.country?.code, detail.country?.abbreviation);
 
   const principles = [...(detail.report_principles ?? [])].sort(
@@ -180,6 +182,23 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   const citedByItems = (detail.cited_by ?? []).map(toLibraryItem);
   const similarItems = (detail.similar_cases ?? []).map(toLibraryItem);
 
+  // A locked reader's entries: the server's two when it cut the case, else
+  // the block the switch picks, of which GuestPrinciples draws two.
+  const guestEntries: GuestEntry[] = !guestFade
+    ? []
+    : detail.locked_preview
+      ? lockedEntries(detail.locked_preview)
+      : guestSource === 'report'
+        ? principles.map((principle) => ({
+            key: String(principle.id),
+            text: principle.principle,
+            after: <PrincipleProof principle={principle} />,
+          }))
+        : flatPrincipleEntries(detail.principles ?? '').map((text, index) => ({
+            key: String(index),
+            text,
+          }));
+
   // The body is the summary; the excerpt is the honest fallback when a case has
   // not been written up yet. Neither is invented when both are absent.
   const summary = detail.body?.trim() || detail.excerpt?.trim() || '';
@@ -214,28 +233,12 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       />
 
       {/* ── The law. ────────────────────────────────────────────────────── */}
-      {guestFade ? (
+      {guestFade && lockReader ? (
         <GuestPrinciples
+          reader={lockReader}
           sub={guestSource === 'report' ? 'Verbatim from the judgment.' : undefined}
-          entries={
-            guestSource === 'report'
-              ? principles.map((principle) => ({
-                  key: String(principle.id),
-                  text: principle.principle,
-                  after: (
-                    <>
-                      {principle.verbatim_window ? (
-                        <JudgmentPassage text={principle.verbatim_window} href={null} />
-                      ) : null}
-                      <PrincipleCaption principle={principle} showLawType />
-                    </>
-                  ),
-                }))
-              : flatPrincipleEntries(detail.principles ?? '').map((text, index) => ({
-                  key: String(index),
-                  text,
-                }))
-          }
+          total={detail.locked_preview?.total}
+          entries={guestEntries}
         />
       ) : principles.length > 0 ? (
         <StructuredPrinciples
@@ -259,8 +262,8 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
           className="flex scroll-mt-6 flex-col gap-3"
         >
           <SectionHeading label="Case summary" />
-          {isLimited ? (
-            <ViewLimitNotice message={detail.limit_message} guest={guest} />
+          {isLimited || lockReader ? (
+            <ViewLimitNotice message={detail.limit_message} reader={lockReader} />
           ) : summary ? (
             <div className="doc-prose">
               <CaseText value={summary} />
@@ -731,11 +734,16 @@ function FlatPrinciples({ text }: { text: string }) {
  * fading. No tabs and no fold: there is nothing left to filter or unfold.
  */
 function GuestPrinciples({
+  reader,
   sub,
+  total,
   entries,
 }: {
+  reader: 'guest' | 'member';
   sub?: string;
-  entries: Array<{ key: string; text: string; after?: React.ReactNode }>;
+  /** How many the full case has; the server's count when it cut the case. */
+  total?: number;
+  entries: GuestEntry[];
 }) {
   if (entries.length === 0) return null;
   const full = entries.length > 1 ? entries[0] : null;
@@ -746,7 +754,7 @@ function GuestPrinciples({
       aria-label="Legal principles"
       className="flex scroll-mt-6 flex-col gap-3"
     >
-      <SectionHeading label="Legal principles" count={entries.length} sub={sub} />
+      <SectionHeading label="Legal principles" count={total ?? entries.length} sub={sub} />
       <ol className="flex flex-col gap-7">
         {full ? (
           <NumberedPrinciple key={full.key} index={0}>
@@ -764,8 +772,43 @@ function GuestPrinciples({
           </div>
         </NumberedPrinciple>
       </ol>
-      <GuestOffer />
+      <GuestOffer reader={reader} />
     </section>
+  );
+}
+
+/**
+ * The server's two entries as the list {@link GuestPrinciples} draws: the
+ * first whole (a report principle with its passage and caption), the second
+ * already cut at a word. With one entry the server sends only the second.
+ */
+function lockedEntries(preview: NonNullable<CaseDetail['locked_preview']>): GuestEntry[] {
+  const entries: GuestEntry[] = [];
+  if (preview.first) {
+    entries.push({
+      key: 'first',
+      text: preview.first.text,
+      after:
+        preview.source === 'report' ? (
+          <PrincipleProof principle={lockedReportPrinciple(preview.first)} />
+        ) : undefined,
+    });
+  }
+  if (preview.second) entries.push({ key: 'second', text: preview.second.text });
+  return entries;
+}
+
+type GuestEntry = { key: string; text: string; after?: React.ReactNode };
+
+/** A report principle's passage and caption, under the whole principle only. */
+function PrincipleProof({ principle }: { principle: ReportPrinciple }) {
+  return (
+    <>
+      {principle.verbatim_window ? (
+        <JudgmentPassage text={principle.verbatim_window} href={null} />
+      ) : null}
+      <PrincipleCaption principle={principle} showLawType />
+    </>
   );
 }
 

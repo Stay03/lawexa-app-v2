@@ -14,6 +14,7 @@ import { NoteTagList } from '../note-tag-list';
 import { notesQueries } from '../queries';
 import { NoteActions } from './NoteActions';
 import { NoteContent } from './NoteContent';
+import { NOTE_LOCK_ID, NoteLockOffer } from './NoteLockOffer';
 import { NoteEmptyBodyState } from './states';
 import './note-masthead.css';
 import './note-document.css';
@@ -84,6 +85,9 @@ export function NoteDocument({
   // empty one.
   const body = note.content?.trim() ?? '';
   const isOwn = editHref !== null;
+  // A guest reading someone else's note gets its first blocks only: the cut
+  // fades into the offer, and the export leads there too.
+  const locked = note.content_locked === true;
   const ownerMark = noteOwnerMark(note, isOwn);
   // A Space's copy reads as a plain note (Stay, 19 October 2026: "No need
   // for all that", like a copied file in a file explorer): no Space label,
@@ -142,6 +146,7 @@ export function NoteDocument({
           isBookmarked={note.is_bookmarked}
           bookmarksCount={note.bookmarks_count}
           canExport={body.length > 0}
+          lockedTo={locked ? NOTE_LOCK_ID : null}
           editHref={editHref}
           canAddToFolder={!isSpaceCopy}
           onHistory={
@@ -155,7 +160,14 @@ export function NoteDocument({
         />
       </header>
 
-      {body ? (
+      {body && locked ? (
+        <div className="flex flex-col gap-6">
+          <div className="v2-note-locked">
+            <NoteContent html={body} />
+          </div>
+          <NoteLockOffer />
+        </div>
+      ) : body ? (
         <NoteContent html={body} />
       ) : (
         <NoteEmptyBodyState editHref={editHref} />

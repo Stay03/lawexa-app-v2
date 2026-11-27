@@ -84,12 +84,14 @@ test('what belongs to an account stays off for a guest pass', () => {
   assert.match(read('v2', 'features', 'conversations', 'server.ts'), /if \(!isAccountRole\(session\.user\.role\)\) return undefined;/);
 });
 
-test('a guest’s case offers an account where a reader over the limit is offered an upgrade', () => {
+test('a locked case offers a guest an account and a member the plans; a reader over the limit an upgrade', () => {
   const doc = read('v2', 'features', 'cases', 'detail', 'CaseDocument.tsx');
-  assert.match(doc, /const role = useV2Session\(\)\.role;\s*const guest = role === 'guest';/);
-  assert.match(doc, /<ViewLimitNotice message=\{detail\.limit_message\} guest=\{guest\} \/>/);
+  assert.match(doc, /const role = useV2Session\(\)\.role;\s*const lockReader = caseLockReader\(detail, role\);/);
+  assert.match(doc, /<ViewLimitNotice message=\{detail\.limit_message\} reader=\{lockReader\} \/>/);
   const states = read('v2', 'features', 'cases', 'detail', 'states.tsx');
-  assert.match(states, /if \(guest\) return <GuestSummaryNotice \/>;/);
-  assert.match(states, /Create a free account to read the summary/);
-  assert.match(states, /href="\/register"[\s\S]*?Create an account[\s\S]*?href=\{signInHref\(pathname\)\}[\s\S]*?Sign in/);
+  assert.match(states, /if \(reader\) return <LockedSummaryNotice reader=\{reader\} \/>;/);
+  assert.match(states, /\{reader === 'member' \? <SeePlansButton \/> : <AccountOfferButtons \/>\}/);
+  const buttons = read('v2', 'shell', 'AccountOfferButtons.tsx');
+  assert.match(buttons, /href="\/register"[\s\S]*?Create an account[\s\S]*?href=\{signInHref\(pathname\)\}[\s\S]*?Sign in/);
+  assert.match(buttons, /href="\/pricing"[\s\S]*?See plans/);
 });

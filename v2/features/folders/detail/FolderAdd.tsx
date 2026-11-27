@@ -194,6 +194,7 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
         id: options?.id,
         ...(options?.plans && { action: plansToastAction((href) => router.push(href)) }),
       }),
+    dismiss: (id) => toast.dismiss(id),
   };
 
   const send = (file: File) => {
