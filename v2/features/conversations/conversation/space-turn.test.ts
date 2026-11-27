@@ -347,10 +347,11 @@ test('the composer gives a refused message back, with its pasted cards and files
   assert.match(composer, /errorTone === 'notice'\s*\? 'text-muted-foreground px-1 text-xs'\s*: 'border-destructive\/40 bg-destructive\/10 text-destructive rounded-xl border px-3 py-2 text-sm',/);
   assert.match(composer, /errorTone === 'notice' \? \(\s*<Clock className="mt-px size-3\.5 shrink-0" aria-hidden \/>\s*\) : \(\s*<AlertCircle/);
   assert.match(composer, /const showError = \(message: string, tone: 'error' \| 'notice' = 'error', plans = false\) => \{/);
-  // Every file error still calls showError with the default (red) tone. The two
-  // quiet ones: the refused send, and a dictated message that went without its voice.
-  assert.equal(composer.match(/showError\([^)]*'notice'/g)?.length, 2, 'only the refused send and the lost voice pass notice');
-  assert.match(composer, /if \(voiceLost\) showError\('[^']+', 'notice'\);/);
+  // Every file error still calls showError with the default (red) tone. The one
+  // quiet one: the refused send. A voice that did not save says so on its own row
+  // now (VoiceClipLine, voice-after-send), so the box no longer passes notice for it.
+  assert.equal(composer.match(/showError\([^)]*'notice'/g)?.length, 1, 'only the refused send passes notice');
+  assert.doesNotMatch(composer, /voiceLost/);
   // A sent tray's thumbnails are released only once the send was taken.
   assert.match(composer, /if \(!outcome\) for \(const u of draft\.uploads\) if \(u\.preview\) URL\.revokeObjectURL\(u\.preview\);/);
   // The case dock passes the refusal through.
