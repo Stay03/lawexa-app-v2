@@ -18,7 +18,8 @@ export interface DictationLiveTokenResponse {
 export interface DictationClipResponse {
   success: boolean;
   message: string;
-  data: { id: number; duration_ms: number } | null;
+  /** `message_id` when the clip was linked to a message already sent (voice after send). */
+  data: { id: number; duration_ms: number; message_id?: number } | null;
 }
 
 /**
@@ -30,6 +31,12 @@ export interface VoiceClip {
   id: number;
   url: string | null;
   duration_ms: number;
+  /**
+   * The app's own: the clip is still on this device, held under this key
+   * until it goes up after the message (v2/runtime/voice-after-send). The url
+   * plays it from memory meanwhile; `id` is 0 until the server keeps it.
+   */
+  pending?: string;
 }
 
 /** The longest clip the server keeps (5 minutes); dictation stops listening there. */

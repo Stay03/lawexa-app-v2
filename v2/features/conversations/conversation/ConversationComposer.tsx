@@ -66,10 +66,10 @@ import { RecordingConsent, RecordingPanel } from '@/v2/features/recording/Record
 import { useRecorder } from '@/v2/features/recording/use-recorder';
 import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
 import { DictateButton } from '@/v2/features/dictation/DictateButton';
+import { holdVoice } from '@/v2/runtime/voice-after-send';
 import { isDictating, useDictation } from '@/v2/features/dictation/use-dictation';
 import { dictateOffer, dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
 import type { DictationResult } from '@/v2/features/dictation/dictation-controller';
-import { dictationApi } from '@/lib/api/dictation';
 import type { VoiceClip } from '@/types/dictation';
 
 /**
@@ -651,32 +651,23 @@ export function ConversationComposer({
 
   // ── Dictation (design A2) ──────────────────────────────────────────────
   const voiceKept = dictationKeepsVoice && keepsVoice({ isConfidential, isRedacted });
-  /** Listening ended with Send: the voice goes up (when kept), then the words go with its id. */
+  /**
+   * Listening ended with Send: the words go at once and stay on screen; the
+   * voice (when kept) plays from this device under them and goes up after the
+   * send, linked to the saved message (v2/runtime/voice-after-send; Arthur,
+   * 27 November 2026: the words vanishing while the voice uploaded).
+   */
   const sendDictated = async ({ text, clip, durationMs }: DictationResult) => {
     // A turn or a file holds Send: the words wait in the box as typed words.
     if (sendHeld || isSubmitting) {
       updateInput((current) => joinText(current, text));
       return;
     }
-    let voiceClip: VoiceClip | null = null;
-    let voiceLost = false;
-    setIsSubmitting(true);
-    try {
-      if (clip && voiceKept) {
-        try {
-          const answer = await dictationApi.uploadClip(clip, durationMs);
-          // The row plays the clip from memory until the transcript's signed url replaces it.
-          if (answer.data) voiceClip = { id: answer.data.id, url: URL.createObjectURL(clip), duration_ms: answer.data.duration_ms };
-          else voiceLost = true;
-        } catch {
-          voiceLost = true;
-        }
-      }
-      await sendDraft(text, voiceClip);
-    } finally {
-      setIsSubmitting(false);
-    }
-    if (voiceLost) showError('Your message went without its voice. The voice did not upload.', 'notice');
+    const voiceClip: VoiceClip | null =
+      clip && voiceKept
+        ? { id: 0, url: URL.createObjectURL(clip), duration_ms: Math.round(durationMs), pending: holdVoice(clip, durationMs) }
+        : null;
+    await sendDraft(text, voiceClip);
   };
   const { state: dictating, dictation } = useDictation({
     onSend: (result) => void sendDictated(result),

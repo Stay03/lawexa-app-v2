@@ -72,6 +72,9 @@ const IDLE: DictationState = {
   problem: null,
 };
 
+/** The voice's bitrate: speech stays clear, a minute is about 240 KB. */
+export const DICTATION_BITRATE = 32_000;
+
 /** How many loudness readings the sound bar draws. */
 const LEVEL_HISTORY = 48;
 
@@ -146,7 +149,9 @@ export class DictationController {
     if (this.startCalledOff()) return this.releaseMedia();
 
     this.pieces = [];
-    this.recorder = new MediaRecorder(this.stream, { mimeType: mime });
+    // 32 kbps keeps a spoken clip small on a slow phone connection (an iPhone's
+    // AAC ran about 27 KB a second, Arthur's 562 KB clip took 30 s to upload).
+    this.recorder = new MediaRecorder(this.stream, { mimeType: mime, audioBitsPerSecond: DICTATION_BITRATE });
     this.recorder.ondataavailable = (event) => {
       if (event.data.size > 0) this.pieces.push(event.data);
     };

@@ -109,6 +109,7 @@ import { heldMarkFromSend, withHeldReleased } from './held-messages';
 import { reportChatError } from '../chat-errors/report';
 import type { IBlockedReason } from '@/types/message-pack';
 import { createCallMatcher } from '@/lib/utils/tool-call-match';
+import { dropVoice, sendHeldVoice } from '../voice-after-send';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -2536,7 +2537,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         ...(isConfidentialTurnN && { messages: priorHistory }),
         // A reply names its target by its saved id (space chat replies).
         ...(convId && options.replyTo && { reply_to_message_id: options.replyTo.id }),
-        ...(voiceClip && { voice_clip_id: voiceClip.id }),
+        // A voice held on the device goes up after the send, linked to the saved message.
+        ...(voiceClip && !voiceClip.pending && { voice_clip_id: voiceClip.id }),
         // Answers to the open question card, one per question in order. A
         // confidential chat's card has no saved id: its answers are the message.
         ...(convId &&
@@ -2562,6 +2564,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         // `persisted_message_ids` cannot cover. Absent for confidential turns, which
         // persist nothing; `rememberAuthoredIds` ignores that.
         const userMessageId = response.data.user_message_id;
+        // The words are in; their voice now goes up, linked to the message they were saved as.
+        if (voiceClip?.pending) {
+          if (userMessageId !== undefined) void sendHeldVoice(voiceClip.pending, userMessageId);
+          else dropVoice(voiceClip.pending);
+        }
         if (userMessageId !== undefined) {
           rememberAuthoredIds([userMessageId]);
           // …and the row itself carries it, as a streamed answer carries its own
@@ -2646,6 +2653,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         connectToStream(executionId);
       } else {
         removeMessage(optimisticMsg.id);
+        if (voiceClip?.pending) dropVoice(voiceClip.pending);
         setState((prev) => ({
           ...prev,
           isStreaming: false,
@@ -2655,6 +2663,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       }
       return null;
     } catch (err) {
+      // Not sent: a voice held for it has nothing to join (the composer gives the words back).
+      if (voiceClip?.pending) dropVoice(voiceClip.pending);
       // 409 PENDING_RESPONSE — a response is already generating. In a space chat
       // it may be another member's (backend B4 names them). The refusal goes back
       // to the host, which gives the message back to the composer and follows the

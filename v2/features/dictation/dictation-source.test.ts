@@ -22,7 +22,9 @@ test('the session carries can_dictate from /auth/me, and the layout publishes it
 
 test('a dictated send carries its clip, and a saved row brings it back', () => {
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
-  assert.match(engine, /\.\.\.\(voiceClip && \{ voice_clip_id: voiceClip\.id \}\),/);
+  // A voice held on the device goes after the words, linked to the saved message (voice-after-send).
+  assert.match(engine, /\.\.\.\(voiceClip && !voiceClip\.pending && \{ voice_clip_id: voiceClip\.id \}\),/);
+  assert.match(engine, /if \(voiceClip\?\.pending\) \{\s*if \(userMessageId !== undefined\) void sendHeldVoice\(voiceClip\.pending, userMessageId\);\s*else dropVoice\(voiceClip\.pending\);/);
   assert.match(read('lib', 'utils', 'transform-api-messages.ts'), /\.\.\.\(apiMsg\.voice_clip && \{ voiceClip: apiMsg\.voice_clip \}\),/);
   assert.match(
     read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts'),
@@ -33,7 +35,7 @@ test('a dictated send carries its clip, and a saved row brings it back', () => {
 test('the voice goes up only where the chat keeps it', () => {
   const composer = read('v2', 'features', 'conversations', 'conversation', 'ConversationComposer.tsx');
   assert.match(composer, /const voiceKept = dictationKeepsVoice && keepsVoice\(\{ isConfidential, isRedacted \}\);/);
-  assert.match(composer, /if \(clip && voiceKept\) \{/);
+  assert.match(composer, /clip && voiceKept\s*\? \{ id: 0, url: URL\.createObjectURL\(clip\), duration_ms: Math\.round\(durationMs\), pending: holdVoice\(clip, durationMs\) \}/);
   // A document's first question starts a new chat, whose send takes no voice.
   assert.match(read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx'), /dictationKeepsVoice=\{surface !== null\}/);
 });

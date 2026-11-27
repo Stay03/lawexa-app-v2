@@ -1,3 +1,4 @@
+import { dropVoice, sendHeldVoice } from '@/v2/runtime/voice-after-send';
 import type { QueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 
@@ -112,6 +113,12 @@ export interface StartConversationInput {
    * never sends one there.
    */
   voiceClipId?: number;
+  /**
+   * A dictated first message's voice still on the device (voice-after-send):
+   * it goes up after the send, linked to the message the chat was started
+   * with, so the words never wait for it (Arthur, 27 November 2026).
+   */
+  voiceKey?: string;
 }
 
 export interface StartConversationDeps {
@@ -343,6 +350,7 @@ export async function startConversation(
       const sentTo = response.data.conversation_id;
       if (await chatIsThere(sentTo)) {
         settleRequestId(firstSend);
+        if (input.voiceKey) dropVoice(input.voiceKey);
         if (confidential && tempConvId && tempConvId !== sentTo) {
           await renameTranscript(tempConvId, sentTo).catch(() => {});
         }
@@ -353,17 +361,25 @@ export async function startConversation(
         // A new id cannot name an old send; if the server says so anyway, its
         // chat is opened rather than a handoff written without an execution.
         settleRequestId(firstSend);
+        if (input.voiceKey) dropVoice(input.voiceKey);
         return { status: 'existing', conversationId: response.data.conversation_id };
       }
     }
 
     if (!response.success) {
+      if (input.voiceKey) dropVoice(input.voiceKey);
       if (tempConvId) await deleteTranscript(tempConvId).catch(() => {});
       throw new Error(response.message || 'Failed to start conversation');
     }
 
     const conversationId = response.data.conversation_id;
     const executionId = response.data.execution_id;
+    // The words are in; their voice goes up now, linked to the first message.
+    if (input.voiceKey) {
+      const uid = response.data.user_message_id;
+      if (uid !== undefined && !confidential && !redacted) void sendHeldVoice(input.voiceKey, uid);
+      else dropVoice(input.voiceKey);
+    }
 
     // Reconcile the IDB temp row with the server id; swap in the redacted form.
     if (confidential) {

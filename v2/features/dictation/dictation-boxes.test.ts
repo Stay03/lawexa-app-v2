@@ -65,10 +65,11 @@ test('no message box in v2 is left without Dictate', () => {
 test('the voice goes where the route keeps it: the chat page and the homepage, never in a private mode', () => {
   const home = read(...BOXES['the homepage and the Space chat dock']);
   assert.match(home, /const voiceKept = keepsVoice\(\{ isConfidential: confidential, isRedacted: redacted \}\);/);
-  assert.match(home, /if \(clip && voiceKept\) \{/);
-  assert.match(home, /\.\.\.\(voiceClipId !== undefined && \{ voiceClipId \}\),/);
+  // The words go first; the voice goes after them, linked to the first message (voice-after-send).
+  assert.match(home, /await submit\(text, clip && voiceKept \? holdVoice\(clip, durationMs\) : undefined\);/);
+  assert.match(home, /\.\.\.\(voiceKey !== undefined && \{ voiceKey \}\),/);
   const start = read('v2', 'features', 'conversations', 'start-conversation.ts');
-  assert.match(start, /\.\.\.\(input\.voiceClipId !== undefined && !confidential && !redacted && \{ voice_clip_id: input\.voiceClipId \}\),/);
+  assert.match(start, /if \(uid !== undefined && !confidential && !redacted\) void sendHeldVoice\(input\.voiceKey, uid\);\s*else dropVoice\(input\.voiceKey\);/);
   // Channel messages and the agent's route take no voice: the words go alone.
   for (const where of ['Space channels and task threads', 'the agent panel']) {
     assert.doesNotMatch(read(...BOXES[where]), /uploadClip|voice_clip_id|voiceClip/, where);

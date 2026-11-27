@@ -44,8 +44,8 @@ import { seedEarlyRuling } from '@/v2/features/conversations/conversation/early-
 import { ActivityStatus } from '@/v2/features/conversations/conversation/ActivityStatus';
 import { REDACTING_LABEL } from '@/v2/features/conversations/conversation/redaction-wait';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { dictationApi } from '@/lib/api/dictation';
 import { DictateButton } from '@/v2/features/dictation/DictateButton';
+import { dropVoice, holdVoice } from '@/v2/runtime/voice-after-send';
 import { DictationCountdown, DictationHint, DictationPanel } from '@/v2/features/dictation/DictationPanel';
 import type { DictationResult } from '@/v2/features/dictation/dictation-controller';
 import { dictateOffer, dictationProblemLine, joinText, keepsVoice } from '@/v2/features/dictation/dictation-model';
@@ -451,7 +451,7 @@ export function HomeComposer({
   const handleSubmit = () => submit(value.trim());
 
   /** Send the first message: typed (the box's words), or dictated (its words and, when kept, its voice). */
-  const submit = async (message: string, voiceClipId?: number) => {
+  const submit = async (message: string, voiceKey?: string) => {
     // A refusal for messages holds Send until the text changes (Enter alone
     // would only ask again and be refused again).
     if (
@@ -462,6 +462,7 @@ export function HomeComposer({
       hasFailedUpload ||
       refusedByMode.length > 0
     ) {
+      if (voiceKey) dropVoice(voiceKey);
       return;
     }
 
@@ -496,7 +497,7 @@ export function HomeComposer({
           references,
           spaceUuid: space?.uuid,
           ...(using.item && { useItems: [using.item] }),
-          ...(voiceClipId !== undefined && { voiceClipId }),
+          ...(voiceKey !== undefined && { voiceKey }),
         },
         { queryClient },
       );
@@ -539,6 +540,7 @@ export function HomeComposer({
       // Keep `isSubmitting` true through navigation so the button never re-arms for
       // a double-submit before the home unmounts.
     } catch (err) {
+      if (voiceKey) dropVoice(voiceKey);
       // Failure: keep the draft + attachments so the user can simply retry.
       const limit = extractUploadLimit(err);
       if (err instanceof RedactionUnavailableError) {
@@ -579,23 +581,17 @@ export function HomeComposer({
   // A new confidential or redacted chat keeps no voice (the server refuses the clip there): its words go alone.
   const voiceKept = keepsVoice({ isConfidential: confidential, isRedacted: redacted });
   const sendHeld = blocked !== null || isSubmitting || isUploading || hasFailedUpload || refusedByMode.length > 0;
-  /** Listening ended with Send: the voice goes up (when kept), then the words go with its id. */
+  /**
+   * Listening ended with Send: the words go at once; the voice (when kept)
+   * goes up after them, linked to the chat's first message (voice-after-send).
+   */
   const sendDictated = async ({ text, clip, durationMs }: DictationResult) => {
     // Something holds Send: the words wait in the box as typed words.
     if (sendHeld) {
       onValueChange(joinText(value, text));
       return;
     }
-    let voiceClipId: number | undefined;
-    if (clip && voiceKept) {
-      try {
-        const answer = await dictationApi.uploadClip(clip, durationMs);
-        if (answer.data) voiceClipId = answer.data.id;
-      } catch {
-        // The words still go; the chat opens on them without a voice.
-      }
-    }
-    await submit(text, voiceClipId);
+    await submit(text, clip && voiceKept ? holdVoice(clip, durationMs) : undefined);
   };
   const { state: dictating, dictation } = useDictation({
     onSend: (result) => void sendDictated(result),
