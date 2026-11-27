@@ -31,6 +31,9 @@ function fakeNotices() {
       if (options) ended.set(options.id, `error: ${message}`);
       else shown.push(`error: ${message}`);
     },
+    dismiss(id) {
+      ended.set(id, 'dismissed');
+    },
   };
   return { notices, ended, shown };
 }
@@ -80,4 +83,14 @@ test('the folder page awaits each file (mutateAsync), never per-call mutate call
 test('"Time\'s up" stays on one line in the frozen rail (Tester, live, 23 October 2026)', () => {
   const timer = readFileSync(join(here, '..', 'quiz', 'solo', 'player', 'AttemptTimer.tsx'), 'utf8');
   assert.match(timer, /<span className=\{cn\(DIGITS, 'w-auto min-w-11 whitespace-nowrap'\)\}>\{label\}<\/span>/);
+});
+
+test('a guest’s upload ends with no toast: the sign-up prompt says why', async () => {
+  const { notices, ended, shown } = fakeNotices();
+  const refused = { response: { status: 403, data: { success: false, code: 'account_required', action: 'upload', message: 'Create a free account to upload files.' } } };
+  await sendFolderUpload(pdf('lease.pdf'), { folder, upload: () => Promise.reject(refused), notices });
+  assert.deepEqual([...ended.values()], ['dismissed']);
+  assert.deepEqual(shown, []);
+  const loose = readFileSync(join(process.cwd(), 'v2', 'features', 'folders', 'list', 'LooseFilesSection.tsx'), 'utf8');
+  assert.match(loose, /if \(accountRequiredOf\(error\)\) \{\s*toast\.dismiss\(id\);\s*return;\s*\}/);
 });

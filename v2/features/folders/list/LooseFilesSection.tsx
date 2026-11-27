@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { accountRequiredOf } from '@/lib/utils/account-required';
 
 import { Button } from '@/components/ui/button';
 import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
@@ -202,6 +203,11 @@ export function useLooseFileUpload(): { pick: () => void; input: ReactNode } {
     uploadAsync(file).then(
       () => toast.success(`Uploaded “${file.name}”`, { id }),
       (error: unknown) => {
+        // A guest's upload: the sign-up prompt says why (lib/utils/account-required.ts).
+        if (accountRequiredOf(error)) {
+          toast.dismiss(id);
+          return;
+        }
         // A plan limit: the server's own sentence, and the plans when a bigger one allows the file.
         const limit = extractUploadLimit(error);
         toast.error(`Couldn’t upload “${file.name}”. ${limit?.message ?? extractApiError(error).message}`, {

@@ -1,3 +1,4 @@
+import { accountRequiredOf } from '@/lib/utils/account-required';
 import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
 import type { UploadLimits } from '@/v2/features/files/upload-limits';
 import { uploadPrecheck } from '@/v2/features/spaces/content-model';
@@ -30,6 +31,8 @@ export interface UploadNotices {
   success(message: string, options: { id: string | number }): unknown;
   /** `plans`: refused at a plan limit a bigger plan allows, so the notice offers the plans. */
   error(message: string, options?: { id: string | number; plans?: boolean }): unknown;
+  /** Takes a file's toast away (a guest's refusal opens the sign-up prompt instead). */
+  dismiss(id: string | number): unknown;
 }
 
 /**
@@ -71,6 +74,11 @@ export async function sendFolderUpload(
     if (error instanceof FiledAfterUploadError) {
       const where = folder.space ? `It is in ${folder.space.name}` : 'It is in your files';
       notices.error(`“${file.name}” uploaded, but couldn’t be added to ${folder.name}. ${where}.`, { id });
+      return;
+    }
+    // A guest's upload: the sign-up prompt says why (lib/utils/account-required.ts).
+    if (accountRequiredOf(error)) {
+      notices.dismiss(id);
       return;
     }
     // A plan limit: the server's own sentence, and the plans when a bigger one allows the file.
