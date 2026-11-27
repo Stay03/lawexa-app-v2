@@ -51,6 +51,7 @@ export function NoteActions({
   isBookmarked,
   bookmarksCount,
   canExport,
+  lockedTo = null,
   editHref,
   canAddToFolder,
   onHistory = null,
@@ -64,6 +65,10 @@ export function NoteActions({
   /** Off when there is no readable body — the server would render an empty
    *  document, and offering the download would promise one. */
   canExport: boolean;
+  /** The lock offer's id when the note is cut for this reader: the server
+   *  refuses the export ("Sign in to export this note."), so Export leads to
+   *  the offer instead of a download that fails. */
+  lockedTo?: string | null;
   /** `/notes/{slug}/edit` for the author, `null` for everyone else. */
   editHref: string | null;
   /** Off for a Space's copy: the server files a copy only in its own Space's
@@ -83,7 +88,14 @@ export function NoteActions({
       />
       {canAddToFolder ? <AddToFolderButton target={{ type: 'note', contentId: noteId }} /> : null}
       <ShareButton path={`/notes/${slug}`} title={title} label="Share this note" />
-      {canExport ? <ExportMenu slug={slug} /> : null}
+      {canExport && lockedTo ? (
+        <button type="button" onClick={() => showOffer(lockedTo)} className={cn(ACTION_PILL, FOCUS_RING)}>
+          <Download aria-hidden className="size-4" />
+          Export
+        </button>
+      ) : canExport ? (
+        <ExportMenu slug={slug} />
+      ) : null}
       {editHref ? (
         <Link href={editHref} className={cn(ACTION_PILL, FOCUS_RING)}>
           <Pencil aria-hidden className="size-4" />
@@ -143,4 +155,12 @@ export function ExportMenu({ slug }: { slug: string }) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+/** Brings the lock offer into view and moves focus to its first button. */
+function showOffer(id: string) {
+  const offer = document.getElementById(id);
+  if (!offer) return;
+  offer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  offer.querySelector<HTMLElement>('a')?.focus({ preventScroll: true });
 }

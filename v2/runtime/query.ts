@@ -7,6 +7,7 @@ import {
   type QueryPersister,
 } from '@tanstack/react-query';
 import { cache } from 'react';
+import { accountRequiredOf } from '@/lib/utils/account-required';
 import type { PersistMode } from './persist/policy';
 
 /**
@@ -243,6 +244,9 @@ export function makeQueryClient(options?: MakeQueryClientOptions): QueryClient {
       // `meta: { silentError: true }` when rendering inline error UI instead.
       onError: (error, _variables, _context, mutation) => {
         if (mutation.meta?.silentError) return;
+        // A guest's refused action already opened the sign-up prompt (the API
+        // client's interceptor): a toast would say the same thing twice.
+        if (accountRequiredOf(error)) return;
         options?.onMutationError?.(getErrorMessage(error), error);
       },
       // ONE invalidation channel: a mutation declares what it dirtied via

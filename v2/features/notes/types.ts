@@ -52,6 +52,15 @@ export interface NoteRecord {
   content?: string | null;
   content_preview: string;
   content_preview_html?: string;
+  /**
+   * Detail only (server guest-locks, 27 November 2026). `true` when `content`
+   * is a cut: a guest reading someone else's note gets whole blocks up to
+   * about 600 characters of text. A guest's own notes and every signed-in
+   * reader get the whole note and `false`. Absent on a server from before.
+   */
+  content_locked?: boolean;
+  /** Words in the whole note; sent only when `content_locked` is true. */
+  total_words?: number;
   /** Detail only. */
   is_private?: boolean;
   /**

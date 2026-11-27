@@ -534,6 +534,39 @@ export interface CaseDetail extends Case {
   updated_at: string;
   limit_exceeded?: boolean;
   limit_message?: string;
+  /** Present only for a reader the case is locked for (a guest, or a
+   *  signed-in reader without a paid plan); see {@link CaseLockedPreview}. */
+  locked_preview?: CaseLockedPreview | null;
+}
+
+/**
+ * What a locked case sends in place of its principles (server guest-locks,
+ * 27 November 2026). The server cuts the case: principles, summary, parties,
+ * authorities and history are absent, so the screen draws these two entries
+ * and the offer, and nothing more.
+ *
+ * `total` counts every entry the full case has (for `report`, every reviewed
+ * principle). With one entry, `first` is null and the entry is `second`, the
+ * faded one. With none, `source` is null and both are null.
+ */
+export interface CaseLockedPreview {
+  reader: 'guest' | 'member';
+  source: 'editorial' | 'report' | null;
+  total: number;
+  first: CaseLockedEntry | null;
+  /** Cut at a word to 600 characters, ending in "…". */
+  second: { text: string } | null;
+}
+
+export interface CaseLockedEntry {
+  text: string;
+  /** For `source: 'report'` only: the passage (at most 1,500 characters). */
+  verbatim_window?: string | null;
+  type?: 'ratio' | 'obiter' | null;
+  law_type?: string[] | null;
+  tag?: string | null;
+  judge?: { name: string; role: CoramRole | null } | null;
+  reviewed?: boolean;
 }
 
 // Pagination metadata from API

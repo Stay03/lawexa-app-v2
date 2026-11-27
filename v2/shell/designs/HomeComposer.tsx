@@ -40,6 +40,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import { uploadAttachment } from '@/v2/features/conversations/attachment-upload';
+import { accountRequiredOf } from '@/lib/utils/account-required';
 import { seedEarlyRuling } from '@/v2/features/conversations/conversation/early-ruling';
 import { ActivityStatus } from '@/v2/features/conversations/conversation/ActivityStatus';
 import { REDACTING_LABEL } from '@/v2/features/conversations/conversation/redaction-wait';
@@ -417,6 +418,11 @@ export function HomeComposer({
             ),
           );
         } catch (err) {
+          // A guest's upload: the sign-up prompt says why, so the chip goes.
+          if (accountRequiredOf(err)) {
+            setUploads((prev) => prev.filter((u) => u.key !== entry.key));
+            return;
+          }
           setUploads((prev) => prev.map((u) => (u.key === entry.key ? failedUpload(u, err) : u)));
         }
       }),

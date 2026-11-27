@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/prompt-input';
 import { cn, serializePastedContent } from '@/lib/utils';
 import { uploadAttachment } from '@/v2/features/conversations/attachment-upload';
+import { accountRequiredOf } from '@/lib/utils/account-required';
 import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
 import { PlansLink } from '@/v2/features/files/PlansLink';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
@@ -551,6 +552,11 @@ export function ConversationComposer({
             ),
           );
         } catch (err) {
+          // A guest's upload: the sign-up prompt says why, so the chip goes.
+          if (accountRequiredOf(err)) {
+            setUploads((prev) => prev.filter((u) => u.key !== entry.key));
+            return;
+          }
           setUploads((prev) => prev.map((u) => (u.key === entry.key ? failedUpload(u, err) : u)));
         }
       }),

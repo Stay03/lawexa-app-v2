@@ -2,14 +2,13 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { ArrowUpRight, Lock, Scale, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CaseViewLimitError } from '@/types/case';
-import { signInHref } from '@/v2/runtime/sign-in-href';
+import { AccountOfferButtons, SeePlansButton } from '@/v2/shell/AccountOfferButtons';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatCaseDate } from '../case-row-model';
 
@@ -144,8 +143,15 @@ export function CaseNotFoundState() {
  * Gold, not red. A limit is an invitation to upgrade, not a failure — the same
  * distinction the composer's block banner draws.
  */
-export function ViewLimitNotice({ message, guest = false }: { message?: string; guest?: boolean }) {
-  if (guest) return <GuestSummaryNotice />;
+export function ViewLimitNotice({
+  message,
+  reader = null,
+}: {
+  message?: string;
+  /** Who the case is locked for; null for the monthly limit. */
+  reader?: CaseLockReader | null;
+}) {
+  if (reader) return <LockedSummaryNotice reader={reader} />;
   return (
     <div className="flex flex-col items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-5">
       <span
@@ -177,26 +183,25 @@ export function ViewLimitNotice({ message, guest = false }: { message?: string; 
   );
 }
 
+/** Who a case is locked for: a guest, or a signed-in reader without a paid
+ *  plan (`member`). */
+export type CaseLockReader = 'guest' | 'member';
+
 /**
- * A GUEST's case (v2 Stage 1, item 1): the API sends a visitor without an
- * account the case with no summary (`limit_exceeded`, principles kept). That
- * is not a monthly limit, so it does not say so; it says what an account gives
- * and offers one, with the way in for someone who already has one. The same
- * door as the statute paywall's guest copy (`StatutePaywall`).
- *
- * The card is for a case with no principles; with principles, the offer sits
- * inline under their fade ({@link GuestOffer}).
+ * A LOCKED case (v2 Stage 1, item 1; server guest-locks, 27 November 2026): a
+ * guest, or a signed-in reader without a paid plan, gets the case without its
+ * summary. That is not a monthly limit, so it does not say so; it says what a
+ * plan gives. A guest gets the way in (an account, or signing in); a member
+ * gets the plans. The card is for a case with no principles; with principles,
+ * the offer sits inline under their fade ({@link GuestOffer}).
  */
-function GuestSummaryNotice() {
+function LockedSummaryNotice({ reader }: { reader: CaseLockReader }) {
   return (
     <div
       id={GUEST_OFFER_ID}
       className="flex scroll-mt-6 flex-col items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-5"
     >
-      <GuestOfferContent
-        title="Create a free account to read the summary"
-        body="The case summary comes with a free Lawexa account."
-      />
+      <GuestOfferContent reader={reader} />
     </div>
   );
 }
@@ -209,24 +214,23 @@ export const GUEST_OFFER_ID = 'case-guest-offer';
  * October 2026, 13:06 UTC): inline under a thin rule, no card, so the fade
  * runs straight into it.
  */
-export function GuestOffer() {
+export function GuestOffer({ reader }: { reader: CaseLockReader }) {
   return (
     <div
       id={GUEST_OFFER_ID}
       className="flex scroll-mt-6 flex-col items-start gap-3 border-t border-border/60 pt-5"
     >
-      <GuestOfferContent
-        title="Create a free account to read the case"
-        body="The full principles and the case summary come with a free Lawexa account."
-      />
+      <GuestOfferContent reader={reader} />
     </div>
   );
 }
 
-function GuestOfferContent({ title, body }: { title: string; body: string }) {
-  // Signing in comes back to this case; signing up goes through the email
-  // check and onboarding first, so it has nothing to come back to.
-  const pathname = usePathname();
+/** The offer's words, the same for both readers (agreed 27 November 2026);
+ *  only the buttons differ. */
+export const CASE_LOCK_TITLE = 'Subscribe to read the full case';
+export const CASE_LOCK_BODY = 'The full principles and the summary come with a Lawexa plan.';
+
+function GuestOfferContent({ reader }: { reader: CaseLockReader }) {
   return (
     <>
       <span
@@ -236,30 +240,10 @@ function GuestOfferContent({ title, body }: { title: string; body: string }) {
         <Lock className="size-5" />
       </span>
       <div className="space-y-1">
-        <p className="text-sm font-semibold text-foreground">{title}</p>
-        <p className="max-w-md text-sm text-muted-foreground">{body}</p>
+        <p className="text-sm font-semibold text-foreground">{CASE_LOCK_TITLE}</p>
+        <p className="max-w-md text-sm text-muted-foreground">{CASE_LOCK_BODY}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href="/register"
-          className={cn(
-            'v2-interactive inline-flex min-h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
-            FOCUS_RING,
-          )}
-        >
-          Create an account
-          <ArrowUpRight aria-hidden className="size-4" />
-        </Link>
-        <Link
-          href={signInHref(pathname)}
-          className={cn(
-            'v2-interactive inline-flex min-h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
-            FOCUS_RING,
-          )}
-        >
-          Sign in
-        </Link>
-      </div>
+      {reader === 'member' ? <SeePlansButton /> : <AccountOfferButtons />}
     </>
   );
 }

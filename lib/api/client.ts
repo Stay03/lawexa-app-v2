@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { getDeviceId, getCachedFingerprint } from '@/lib/utils/device-id';
 import { captureVisit, isViewRequest, startView, viewHeaders } from '@/lib/utils/view-signals';
+import { accountRequiredOf, showAccountRequired } from '@/lib/utils/account-required';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -52,6 +53,10 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // A guest's refused action: the v2 shell shows the sign-up prompt.
+    const refusal = accountRequiredOf(error);
+    if (refusal && typeof window !== 'undefined') showAccountRequired(refusal);
+
     if (error.response?.status === 401) {
       const authState = useAuthStore.getState();
 

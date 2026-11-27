@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowUpRight, Lock } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { AccountOfferButtons } from '@/v2/shell/AccountOfferButtons';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /**
@@ -23,13 +24,11 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * `statute-document.css` (`.akn-paywall-*`), structure lives here.
  *
  * ── THE VIEWER-AWARE ACTION ─────────────────────────────────────────────────
- * Only two viewers can ever see this (signed-out visitors are gated off the
- * reader entirely, and paid readers get no marker):
- *   guest  → `/register`, "Create an account" — guests are view-only
- *            pre-registration, so the path to a plan starts with an account
- *            (the RadarsGuestState convention).
- *   member → `/upgrade`, "Upgrade plan" — the in-app upgrade convention
- *            (the case page's limit states).
+ *   guest  → "Sign in to read the rest": every signed-in reader, free
+ *            included, gets the whole statute (server guest-locks, 27
+ *            November 2026), so the way on is an account or signing in.
+ *   member → "Upgrade plan" to `/pricing`. Only a server from before the
+ *            guest locks cuts a member's statute; the copy stays for it.
  *
  * The card carries {@link STATUTE_PAYWALL_ID}: locked contents entries and
  * locked citation arrivals scroll HERE — there is no text to scroll to.
@@ -54,18 +53,20 @@ export function StatutePaywall({
   const counted = totalSections !== null && includedSections !== null;
 
   const headline =
-    totalSections !== null
-      ? `Read all ${totalSections} sections`
-      : 'Read the full statute';
+    viewer === 'guest'
+      ? 'Sign in to read the rest'
+      : totalSections !== null
+        ? `Read all ${totalSections} sections`
+        : 'Read the full statute';
 
   const line =
     viewer === 'guest'
-      ? counted
-        ? `You've read ${includedSections} of ${totalSections} sections free — reading the rest takes an account on a paid plan.`
-        : 'This free excerpt ends here — reading the rest takes an account on a paid plan.'
+      ? totalSections !== null
+        ? `All ${totalSections} sections come with a free Lawexa account.`
+        : 'The full statute comes with a free Lawexa account.'
       : counted
-        ? `You've read ${includedSections} of ${totalSections} sections free — the rest is available on a paid plan.`
-        : 'This free excerpt ends here — the rest is available on a paid plan.';
+        ? `You've read ${includedSections} of ${totalSections} sections free. The rest is available on a paid plan.`
+        : 'This free excerpt ends here. The rest is available on a paid plan.';
 
   return (
     <div className="akn-paywall motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
@@ -81,18 +82,22 @@ export function StatutePaywall({
         </p>
         <h2 className="akn-paywall-title">{headline}</h2>
         <p className="akn-paywall-copy">{line}</p>
-        <p className="pt-4">
-          <Link
-            href={viewer === 'guest' ? '/register' : '/pricing'}
-            className={cn(
-              'v2-interactive inline-flex min-h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
-              FOCUS_RING,
-            )}
-          >
-            {viewer === 'guest' ? 'Create an account' : 'Upgrade plan'}
-            <ArrowUpRight aria-hidden className="size-4" />
-          </Link>
-        </p>
+        {viewer === 'guest' ? (
+          <AccountOfferButtons className="pt-4" />
+        ) : (
+          <p className="pt-4">
+            <Link
+              href="/pricing"
+              className={cn(
+                'v2-interactive inline-flex min-h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+                FOCUS_RING,
+              )}
+            >
+              Upgrade plan
+              <ArrowUpRight aria-hidden className="size-4" />
+            </Link>
+          </p>
+        )}
       </section>
     </div>
   );

@@ -527,8 +527,7 @@ export function StatuteDocument({
       if (serverOutline?.lockedAnchorIds.has(initialHash)) {
         return {
           kind: 'paywall',
-          message:
-            'This provision is in the full statute — upgrade to read it.',
+          message: `This provision is in the full statute. ${lockedProvisionAction(role)}`,
         };
       }
     }
@@ -543,7 +542,7 @@ export function StatuteDocument({
       if (locked) {
         return {
           kind: 'paywall',
-          message: `${locked.label} is in the full statute — upgrade to read it.`,
+          message: `${locked.label} is in the full statute. ${lockedProvisionAction(role)}`,
         };
       }
     }
@@ -556,6 +555,7 @@ export function StatuteDocument({
     citation,
     serverOutline,
     outlineData,
+    role,
   ]);
 
   // WHICH provision value the arrival jump already ran for — `undefined`
@@ -977,4 +977,11 @@ function DocumentBodySkeleton() {
       </div>
     </>
   );
+}
+
+/** What a locked arrival tells the reader to do: a guest signs in (every
+ *  signed-in reader gets the whole statute); a member on a server from before
+ *  the guest locks upgrades. */
+function lockedProvisionAction(role: string | null | undefined): string {
+  return role === 'guest' ? 'Sign in to read it.' : 'Upgrade to read it.';
 }
