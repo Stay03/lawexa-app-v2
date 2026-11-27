@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useRef, useState, type ReactNode, type RefObject } from 'react';
 
-import { useComposerDraft } from './composer/useComposerDraft';
+import { saveComposerDraft, useComposerDraft } from './composer/useComposerDraft';
 
 /**
  * The home's ONE chat box, shared by Chat, Work and Study (Stay, 24 October
@@ -34,8 +34,14 @@ interface HomeComposerState {
 const HomeComposerContext = createContext<HomeComposerState | null>(null);
 
 export function HomeComposerProvider({ children }: { children: ReactNode }) {
-  const [value, setValue] = useComposerDraft();
-  const [confidential, setConfidential] = useState(false);
+  const [confidential, setConfidentialMode] = useState(false);
+  // While confidential is on, the typed question stays in memory only.
+  const [value, setValue] = useComposerDraft(!confidential);
+  const setConfidential = (next: boolean) => {
+    setConfidentialMode(next);
+    // On: the draft already saved leaves the device. Off: what is typed is kept again.
+    saveComposerDraft(next ? '' : value);
+  };
   const [redacting, setRedacting] = useState(false);
   const areaRef = useRef<HTMLDivElement>(null);
   return (

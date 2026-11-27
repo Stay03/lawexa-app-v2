@@ -42,7 +42,7 @@ export function saveComposerDraft(next: string): void {
   }
 }
 
-export function useComposerDraft(): readonly [string, (next: string) => void] {
+export function useComposerDraft(saveOnDevice = true): readonly [string, (next: string) => void] {
   const [value, setValue] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
     const ask = readAsk({ kind: 'home' });
@@ -54,10 +54,12 @@ export function useComposerDraft(): readonly [string, (next: string) => void] {
     }
   });
 
+  // A confidential question is never written to localStorage (the review of
+  // f98269c3): the draft stays in memory only while the switch is on.
   const set = useCallback((next: string) => {
     setValue(next);
-    saveComposerDraft(next);
-  }, []);
+    if (saveOnDevice) saveComposerDraft(next);
+  }, [saveOnDevice]);
 
   return [value, set] as const;
 }

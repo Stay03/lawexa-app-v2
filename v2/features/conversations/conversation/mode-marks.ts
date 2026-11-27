@@ -20,8 +20,10 @@ import { useSyncExternalStore } from 'react';
  * SAME marks v1 reads, at event time.
  *
  * The store merges two sources so a mark is honored no matter where it came from:
- *  1. The persisted sessionStorage envelope (written by create + hard-nav, or by
- *     a prior v1 turn) — seeded lazily on first access.
+ *  1. The persisted sessionStorage envelope (written when a private chat is
+ *     created, or by a prior v1 turn) — seeded lazily on first access, once per
+ *     page load. A chat created on this page is also marked in memory by
+ *     `startConversation`, since the envelope is not read again.
  *  2. In-session marks the controller adds after the fact — {@link markConfidential}
  *     when a device-local transcript is found in IndexedDB, {@link markRedacted}
  *     when a server-loaded conversation carries `is_redacted: true`.

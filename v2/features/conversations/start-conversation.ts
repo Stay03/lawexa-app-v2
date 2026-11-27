@@ -46,8 +46,9 @@ import { markConfidential, markRedacted } from './conversation/mode-marks';
  *  3. `sessionStorage['lawexa-confidential-mode' | 'lawexa-redacted-mode']` — v1's
  *     confidential / redacted Zustand stores persist to sessionStorage; v2 cannot
  *     import those stores (boundary), so it writes their marks in the exact
- *     zustand-persist envelope and the caller HARD-navigates for those modes, so
- *     v1's store hydrates the mark fresh on the new page (see below).
+ *     zustand-persist envelope, so a reload of the chat still knows the mode. The
+ *     same marks go into the v2 mark store's memory (mode-marks.ts) before the
+ *     in-app move, since that store reads sessionStorage only once per page load.
  *
  * CONFIDENTIAL. Confidential conversations are device-owned: the transcript lives in
  * IndexedDB (`v2/runtime/chat-engine/confidential-transcript`, the SAME physical DB
@@ -231,12 +232,30 @@ function bridgeJurisdiction(conversationId: string, choice: JurisdictionChoice):
 }
 
 /**
+ * Mark a private chat in both stores before the app moves to it: sessionStorage
+ * (what a reload reads) and the v2 mark store's memory (what this page reads; it
+ * reads sessionStorage only once per page load). Every path that opens a new or
+ * existing private chat from a send calls this, so its engine routes the turn to
+ * the device from the first event.
+ */
+function markPrivateModes(conversationId: string, confidential: boolean, redacted: boolean): void {
+  if (confidential) {
+    markInV1ModeStore('lawexa-confidential-mode', 'confidentialIds', conversationId);
+    markConfidential(conversationId);
+  }
+  if (redacted) {
+    markInV1ModeStore('lawexa-redacted-mode', 'redactedIds', conversationId);
+    markRedacted(conversationId);
+  }
+}
+
+/**
  * Mark a conversation in v1's confidential / redacted Zustand store by writing its
  * sessionStorage persistence entry in zustand's exact envelope (`{ state, version }`,
  * version 0 — verified against the store definitions and zustand's persist source).
- * Reads-merges-writes so any ids already marked this session are preserved. The
- * caller hard-navigates for these modes, so v1's store hydrates this mark fresh on
- * the new page (a soft nav could miss it if the store module were already resident).
+ * Reads-merges-writes so any ids already marked this session are preserved. It is
+ * what a later reload reads; the in-app move relies on the in-memory mark set
+ * beside it ({@link markPrivateModes}).
  */
 function markInV1ModeStore(
   storageKey: string,
@@ -355,6 +374,7 @@ export async function startConversation(
         if (confidential && tempConvId && tempConvId !== sentTo) {
           await renameTranscript(tempConvId, sentTo).catch(() => {});
         }
+        markPrivateModes(sentTo, confidential, redacted);
         return { status: 'existing', conversationId: sentTo };
       }
       response = await post(renewRequestId(firstSend));
@@ -404,23 +424,13 @@ export async function startConversation(
     // form — never the raw input (falls back to the input in passthrough mode).
     const displayMessage = response.data.user_message_content ?? message;
 
-    // The private modes, marked twice. In sessionStorage (see helper), so a
-    // reload of the chat still knows them. And in the v2 mark store's memory,
-    // which reads sessionStorage only once per page load: a new chat's mark
-    // written there alone was unseen until a full reload, which is why this
-    // page used to reload into a private chat. That reload took seconds on a
-    // phone, and a fast confidential answer finished before the chat joined its
-    // stream, so the answer was lost (Arthur, 27 November 2026). Marked in
-    // memory here, before the move, the chat's engine routes this turn to the
-    // device from its first event, and the move is the ordinary in-app one.
-    if (confidential) {
-      markInV1ModeStore('lawexa-confidential-mode', 'confidentialIds', conversationId);
-      markConfidential(conversationId);
-    }
-    if (redacted) {
-      markInV1ModeStore('lawexa-redacted-mode', 'redactedIds', conversationId);
-      markRedacted(conversationId);
-    }
+    // The private modes, marked in sessionStorage and in memory (see helper). A
+    // mark written to sessionStorage alone was unseen until a full reload, which
+    // is why this page used to reload into a private chat. That reload took
+    // seconds on a phone, and a fast confidential answer finished before the chat
+    // joined its stream, so the answer was lost (Arthur, 27 November 2026).
+    // Marked here, before the move, the move is the ordinary in-app one.
+    markPrivateModes(conversationId, confidential, redacted);
 
     bridgeJurisdiction(conversationId, jurisdiction);
     // No answer coming (a tag-only Space, an untagged first message): nothing to
@@ -438,9 +448,9 @@ export async function startConversation(
 
     // Put the new conversation at the top of every recents cache IMMEDIATELY, so the
     // sidebar/drawer/home show it without waiting on a refetch (wave-4 acceptance b).
-    // SKIPPED for confidential/redacted: those hard-navigate (below), which rebuilds
-    // the cache from the server anyway — and a confidential message's text must never
-    // land in the recents cache, even transiently and even though it's client-only.
+    // SKIPPED for confidential/redacted: the invalidation below brings their row from
+    // the server, and a confidential message's text must never land in the recents
+    // cache, even transiently and even though it's client-only.
     // The title is the user's own first message (honest, informative); the follow-up
     // invalidation replaces the whole placeholder row with server truth.
     if (!confidential && !redacted) {
@@ -478,6 +488,7 @@ export async function startConversation(
         if (confidential && tempConvId && tempConvId !== existing) {
           await renameTranscript(tempConvId, existing).catch(() => {});
         }
+        markPrivateModes(existing, confidential, redacted);
         return { status: 'existing', conversationId: existing };
       }
     }
