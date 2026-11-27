@@ -5,6 +5,9 @@ import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 
 import { apiClient } from '@/lib/api/client';
 import { newRequestId, requestIdFor, settleRequestId, type FirstSend } from './first-send-id';
 import { startConversation, type StartConversationInput } from './start-conversation';
+import { isConfidentialMark, isRedactedMark } from './conversation/mode-marks';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /* A new chat's first send carries `client_request_id`, and a retry of it the
  * same one (backend contract, 17 October 2026). The server below keeps its
@@ -168,7 +171,7 @@ test('the chat the retry names was deleted since: sent again under a new id', as
     server.finishAll();
     server.deleteAll();
     const retry = await start(client, send);
-    assert.deepEqual(retry, { status: 'created', conversationId: 'chat-2', hardNavigate: false });
+    assert.deepEqual(retry, { status: 'created', conversationId: 'chat-2' });
     assert.equal(server.posts.length, 3, 'the first send, the retry, and one send again');
     assert.equal(server.posts[1].client_request_id, server.posts[0].client_request_id);
     assert.notEqual(server.posts[2].client_request_id, server.posts[1].client_request_id);
@@ -209,4 +212,27 @@ test('the uuid is a v4 even without crypto.randomUUID', () => {
   } finally {
     Object.defineProperty(crypto, 'randomUUID', { value: original, configurable: true });
   }
+});
+
+/* A private chat's first send moves inside the app, with no reload (Arthur,
+ * 27 November 2026). The reload existed because the v2 mark store reads
+ * sessionStorage once per page load; a new chat's mark written only there was
+ * unseen until a reload. The marks now go into the store's memory too, before
+ * the move, so the chat routes its first turn to the device from its first event. */
+for (const mode of ['confidential', 'redacted'] as const) test(`a ${mode} first send marks the chat in memory and moves without a reload`, async () => {
+  await withServer(async (_server, client) => {
+    // The store was read before this send, as on a home page that has been open a while.
+    assert.equal(isConfidentialMark('seeded-before'), false);
+    const result = await startConversation({ ...input(), [mode]: true }, { queryClient: client });
+    assert.equal(result.status, 'created');
+    assert.equal('hardNavigate' in result, false, 'no reload asked for');
+    const marked = mode === 'confidential' ? isConfidentialMark : isRedactedMark;
+    assert.equal(marked(result.conversationId), true, `the ${mode} mark is in memory before the move`);
+  });
+});
+
+test('the home box opens every new chat inside the app, private ones too', () => {
+  const home = readFileSync(join(process.cwd(), 'v2', 'shell', 'designs', 'HomeComposer.tsx'), 'utf8');
+  assert.doesNotMatch(home, /window\.location\.assign/);
+  assert.match(home, /router\.push\(target\);/);
 });

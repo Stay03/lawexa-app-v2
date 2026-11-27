@@ -23,6 +23,7 @@ import { renewRequestId, requestIdFor, settleRequestId, type FirstSend } from '.
 import { conversationsQueries } from './queries';
 import { settleRedactionDefault } from './redaction-default-cache';
 import { expectsAiReply } from '@/v2/runtime/chat-engine/ai-reply';
+import { markConfidential, markRedacted } from './conversation/mode-marks';
 
 /**
  * startConversation — the ONE create-a-conversation flow for v2, extracted so both
@@ -127,9 +128,9 @@ export interface StartConversationDeps {
 }
 
 export type StartConversationResult =
-  /** A brand-new conversation: the handoff is written; navigate to `/c/{id}?init=1`.
-   *  `hardNavigate` is set for confidential/redacted so v1's mode store rehydrates. */
-  | { status: 'created'; conversationId: string; hardNavigate: boolean }
+  /** A brand-new conversation: the handoff is written; navigate to `/c/{id}?init=1`
+   *  inside the app, private modes included (the marks are already in memory). */
+  | { status: 'created'; conversationId: string }
   /** 409 — a pending conversation already exists; navigate to it (no handoff). */
   | { status: 'existing'; conversationId: string };
 
@@ -403,12 +404,22 @@ export async function startConversation(
     // form — never the raw input (falls back to the input in passthrough mode).
     const displayMessage = response.data.user_message_content ?? message;
 
-    // Bridge v1's session-scoped mode stores (see helper) — hard-nav needed.
+    // The private modes, marked twice. In sessionStorage (see helper), so a
+    // reload of the chat still knows them. And in the v2 mark store's memory,
+    // which reads sessionStorage only once per page load: a new chat's mark
+    // written there alone was unseen until a full reload, which is why this
+    // page used to reload into a private chat. That reload took seconds on a
+    // phone, and a fast confidential answer finished before the chat joined its
+    // stream, so the answer was lost (Arthur, 27 November 2026). Marked in
+    // memory here, before the move, the chat's engine routes this turn to the
+    // device from its first event, and the move is the ordinary in-app one.
     if (confidential) {
       markInV1ModeStore('lawexa-confidential-mode', 'confidentialIds', conversationId);
+      markConfidential(conversationId);
     }
     if (redacted) {
       markInV1ModeStore('lawexa-redacted-mode', 'redactedIds', conversationId);
+      markRedacted(conversationId);
     }
 
     bridgeJurisdiction(conversationId, jurisdiction);
@@ -454,11 +465,7 @@ export async function startConversation(
     if (redacted) settleRedactionDefault(deps.queryClient, input.redactionCategories);
 
     settleRequestId(firstSend);
-    return {
-      status: 'created',
-      conversationId,
-      hardNavigate: Boolean(confidential || redacted),
-    };
+    return { status: 'created', conversationId };
   } catch (err) {
     // 409 — the user already has a pending conversation (e.g. navigated back and
     // resent). Reuse it; v1's page recovers the in-flight stream from status/IDB.

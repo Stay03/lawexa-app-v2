@@ -2,7 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { answerAlreadyShown, textlessTerminalDraw, turnEndsWithError, withoutReplayedRows } from './replayed-answer';
+import {
+  answerAlreadyShown,
+  ENDED_ON_THIS_DEVICE,
+  lostAnswerLine,
+  OWN_ANSWER_NOT_SHOWN,
+  textlessTerminalDraw,
+  turnEndsWithError,
+  withoutReplayedRows,
+} from './replayed-answer';
 import type { EngineMessage } from './types';
 
 const at = new Date('2026-11-12T07:14:52Z');
@@ -96,4 +104,15 @@ test('the same error last in the turn is drawn once; another error, or one in an
   assert.equal(turnEndsWithError([user('u1'), lost('e1')], 'Something went wrong', 'TRANSCRIPT_LOST'), false);
   assert.equal(turnEndsWithError([user('u0'), lost('e0'), user('u1')], message, 'TRANSCRIPT_LOST'), false);
   assert.equal(turnEndsWithError([user('u1'), lost('e1'), answer('a1')], message, 'TRANSCRIPT_LOST'), false);
+});
+
+test('a lost confidential answer on the reader own turn says to ask again; any other says the chat ended here', () => {
+  assert.equal(lostAnswerLine('own'), "The answer couldn't be shown on this device. Ask again.");
+  assert.equal(lostAnswerLine('own'), OWN_ANSWER_NOT_SHOWN);
+  assert.equal(lostAnswerLine('followed'), ENDED_ON_THIS_DEVICE);
+  assert.equal(lostAnswerLine(null), 'This confidential conversation has ended on this device.');
+  // The engine draws the line for the turn it is on, and offers no Try again
+  // (a retry re-reads the server, which keeps no confidential text).
+  const engine = readFileSync(join(process.cwd(), 'v2', 'runtime', 'chat-engine', 'engine.ts'), 'utf8');
+  assert.match(engine, /addErrorMessage\(lostAnswerLine\(state\.turnOrigin\), 'TRANSCRIPT_LOST', false, null\)/);
 });

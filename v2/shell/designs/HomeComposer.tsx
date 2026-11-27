@@ -527,22 +527,18 @@ export function HomeComposer({
       // chat's docked box (ChatDock) is the real one from the move's first
       // frame, held while the first answer streams, not a skeleton until the
       // chat's screen says so (message box B).
-      if (!result.hardNavigate && userId !== null) {
+      if (userId !== null) {
         seedEarlyRuling(result.conversationId, {
           ownerId: userId,
           canSend: true,
           viewOnlyReason: 'shared',
           spaceUuid: space?.uuid ?? null,
-          isConfidential: false,
+          isConfidential: confidential,
         });
       }
-      if (result.hardNavigate) {
-        // Confidential / redacted: a fresh load so v1's session mode store hydrates
-        // the mark we wrote, regardless of whether its module was already resident.
-        window.location.assign(target);
-      } else {
-        router.push(target);
-      }
+      // Private chats too: startConversation marked them in memory, so no
+      // reload, and the chat joins its first answer's stream at once.
+      router.push(target);
       // Keep `isSubmitting` true through navigation so the button never re-arms for
       // a double-submit before the home unmounts.
     } catch (err) {

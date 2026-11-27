@@ -89,6 +89,21 @@ export function textlessTerminalDraw(
   return shown !== null ? 'nothing' : 'lost';
 }
 
+/** What a confidential turn with no answer anywhere says. */
+export const ENDED_ON_THIS_DEVICE = 'This confidential conversation has ended on this device.';
+/**
+ * …and on the reader's own just-sent turn, whose answer never reached this
+ * device (a stream joined after the server had finished, 27 November 2026).
+ * The chat has not ended: the reader asks again in the box below. No Try again
+ * button: a retry re-reads the server's status, which keeps no confidential text.
+ */
+export const OWN_ANSWER_NOT_SHOWN = "The answer couldn't be shown on this device. Ask again.";
+
+/** Which of the two lines a lost confidential answer draws. */
+export function lostAnswerLine(origin: 'own' | 'followed' | null): string {
+  return origin === 'own' ? OWN_ANSWER_NOT_SHOWN : ENDED_ON_THIS_DEVICE;
+}
+
 /**
  * Whether the turn already ends with this error. A terminal error delivered
  * again (the stream reconnecting on its own after a drop) drew a second error

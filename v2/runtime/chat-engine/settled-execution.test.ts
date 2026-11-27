@@ -161,7 +161,9 @@ test('a second completed without text, after the live one on the same stream, le
 
 test('the same error delivered twice is drawn once', async () => {
   // No answer on screen and no transcript on this device (Node has no IndexedDB):
-  // each textless terminal reaches "ended on this device"; the second adds nothing.
+  // each textless terminal reaches the lost line; the second adds nothing. The
+  // handoff makes it the reader's own turn, so the line says to ask again
+  // (27 November 2026; it said "ended on this device" before).
   const engine = createChatEngine({ getToken: () => 'test-token', isConfidential: () => true });
   engine.setConversationId('conv-1');
   engine.connectToStream('exec-4', 'TEST DATA. Is the lease registered?');
@@ -178,6 +180,6 @@ test('the same error delivered twice is drawn once', async () => {
   await advance(2_000);
 
   const errors = assistantRows(engine).filter((m) => 'messageType' in m && m.messageType === 'error');
-  assert.deepEqual(errors.map((m) => m.content), ['This confidential conversation has ended on this device.']);
+  assert.deepEqual(errors.map((m) => m.content), ["The answer couldn't be shown on this device. Ask again."]);
   engine.disconnect();
 });

@@ -93,7 +93,7 @@ import type {
 } from './types';
 import { expectsAiReply } from './ai-reply';
 import { answerMessageId, stampAnswerId } from './answer-id';
-import { answerAlreadyShown, textlessTerminalDraw, turnEndsWithError, withoutReplayedRows } from './replayed-answer';
+import { answerAlreadyShown, lostAnswerLine, textlessTerminalDraw, turnEndsWithError, withoutReplayedRows } from './replayed-answer';
 import { adoptDraftEditResults, adoptServerFields } from './server-fields';
 import { answersPayload, cardRefusalSentence, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
 import { withSkillDraftFromCompleted, withSkillDraftStatus } from './skill-draft-rows';
@@ -1838,8 +1838,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           } catch {
             savedAnswer = null;
           }
-          const lostLine = () =>
-            addErrorMessage('This confidential conversation has ended on this device.', 'TRANSCRIPT_LOST', false, null);
+          const lostLine = () => addErrorMessage(lostAnswerLine(state.turnOrigin), 'TRANSCRIPT_LOST', false, null);
           const placeholderId = streamingMessageId;
           if (placeholderId) {
             if (!savedAnswer) {

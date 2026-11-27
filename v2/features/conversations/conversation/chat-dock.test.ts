@@ -98,9 +98,9 @@ test('a chat the reader just started is theirs from the move’s first frame (th
     spaceUuid: 's-1',
     isConfidential: false,
   });
-  // The home and space boxes seed it, except for a hard (confidential) load.
+  // The home and space boxes seed it, private chats included (no reload any more).
   const home = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
-  assert.match(home, /if \(!result\.hardNavigate && userId !== null\) \{\s*seedEarlyRuling\(result\.conversationId, \{/);
+  assert.match(home, /if \(userId !== null\) \{\s*seedEarlyRuling\(result\.conversationId, \{[\s\S]*?isConfidential: confidential,/);
   client.clear();
 });
 
