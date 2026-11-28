@@ -158,6 +158,8 @@ interface StoredInit {
   attachments?: InitAttachment[];
   /** The first message's saved id (start-conversation.ts). */
   uid?: number;
+  /** The key of the first message's voice, going up after it (voice-after-send). */
+  voice?: string;
   file_id?: number;
   file_name?: string;
   file_size?: number;
@@ -171,6 +173,8 @@ function readConvInit(conversationId: string): {
   redaction?: RedactionSummary;
   /** The first message's saved id, when the home composer handed it over. */
   userMessageId: number | null;
+  /** The held voice's key, when the home composer sent one with it. */
+  voiceKey?: string;
 } {
   if (typeof window === 'undefined') {
     return { message: null, executionId: null, attachments: undefined, userMessageId: null };
@@ -195,6 +199,7 @@ function readConvInit(conversationId: string): {
       attachments,
       userMessageId: typeof parsed.uid === 'number' ? parsed.uid : null,
       ...(isRedactionSummary(parsed.redaction) && { redaction: parsed.redaction }),
+      ...(typeof parsed.voice === 'string' && parsed.voice && { voiceKey: parsed.voice }),
     };
   } catch {
     return { message: null, executionId: null, attachments: undefined, userMessageId: null };
@@ -613,13 +618,13 @@ export function useConversationController(
     let cancelled = false;
     liveRef.current = conversationId;
 
-    const { message, executionId, attachments, redaction, userMessageId } = readConvInit(conversationId);
+    const { message, executionId, attachments, redaction, userMessageId, voiceKey } = readConvInit(conversationId);
     setConversationId(conversationId);
 
     if (executionId && message) {
       // Fresh handoff from the home composer: attach to the live execution. The
       // creator is the owner (server-verified id threaded from the page).
-      connectToStream(executionId, message, attachments, redaction, userMessageId);
+      connectToStream(executionId, message, attachments, redaction, userMessageId, voiceKey);
       if (serverUserId != null) setLocalOwnerId(serverUserId);
       // Drop the ?init=1 marker so a manual reload takes the recovery path —
       // unless embedded, where the URL is the HOST's (`/cases/…?chat=…`, no

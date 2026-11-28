@@ -109,7 +109,7 @@ import { heldMarkFromSend, withHeldReleased } from './held-messages';
 import { reportChatError } from '../chat-errors/report';
 import type { IBlockedReason } from '@/types/message-pack';
 import { createCallMatcher } from '@/lib/utils/tool-call-match';
-import { dropVoice, sendHeldVoice } from '../voice-after-send';
+import { dropVoice, heldVoiceClip, sendHeldVoice } from '../voice-after-send';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -1403,6 +1403,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     initialAttachments?: MessageAttachment[] | MessageAttachment,
     initialRedaction?: RedactionSummary,
     initialMessageId?: number | null,
+    initialVoiceKey?: string,
   ) {
     const token = getToken();
     if (!token) {
@@ -1432,6 +1433,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         rememberAuthoredIds([initialMessageId]);
         setMessages((msgs) => msgs.map((m) => (m.id === handed.id ? { ...m, savedId: initialMessageId } : m)));
       }
+      // A dictated homepage question: its voice line, saving then playable, as
+      // a question sent from this box draws it (voice-after-send).
+      const voiceClip = initialVoiceKey ? heldVoiceClip(initialVoiceKey) : null;
+      if (voiceClip) setMessages((msgs) => msgs.map((m) => (m.id === handed.id ? { ...m, voiceClip } : m)));
     }
 
     // A TURN BEGINS. Counted here rather than in `send()` because this is the one

@@ -67,9 +67,15 @@ test('the voice goes where the route keeps it: the chat page and the homepage, n
   assert.match(home, /const voiceKept = keepsVoice\(\{ isConfidential: confidential, isRedacted: redacted \}\);/);
   // The words go first; the voice goes after them, linked to the first message (voice-after-send).
   assert.match(home, /await submit\(text, clip && voiceKept \? holdVoice\(clip, durationMs\) : undefined\);/);
+  // The dictated words stand in the box while the chat is made, as typed words do (Lucy, 27 November 2026).
+  assert.match(home, /onValueChange\(text\);\s*await submit\(text,/);
   assert.match(home, /\.\.\.\(voiceKey !== undefined && \{ voiceKey \}\),/);
   const start = read('v2', 'features', 'conversations', 'start-conversation.ts');
   assert.match(start, /if \(uid !== undefined && !confidential && !redacted\) void sendHeldVoice\(input\.voiceKey, uid\);\s*else dropVoice\(input\.voiceKey\);/);
+  // The handoff names the voice going up, so the chat page's first row shows it.
+  assert.match(start, /voice: voiceGoing,/);
+  const controller = read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
+  assert.match(controller, /connectToStream\(executionId, message, attachments, redaction, userMessageId, voiceKey\);/);
   // Channel messages and the agent's route take no voice: the words go alone.
   for (const where of ['Space channels and task threads', 'the agent panel']) {
     assert.doesNotMatch(read(...BOXES[where]), /uploadClip|voice_clip_id|voiceClip/, where);

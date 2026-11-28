@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { VOICE_TRIES, dropVoice, heldVoiceState, holdVoice, retryHeldVoice, sendHeldVoice } from './voice-after-send';
+import { VOICE_TRIES, dropVoice, heldVoiceClip, heldVoiceState, holdVoice, retryHeldVoice, sendHeldVoice } from './voice-after-send';
 
 /* Arthur, 27 November 2026 (ce4eb347): "after send the text vanishes
  * momentarily and it's terrible UX". The words go at once; the voice goes up
@@ -80,4 +80,16 @@ test('the voice is recorded at 32 kbps, so a phone uploads it quickly', () => {
   assert.match(controller, /export const DICTATION_BITRATE = 32_000;/);
   assert.match(controller, /new MediaRecorder\(this\.stream, \{ mimeType: mime, audioBitsPerSecond: DICTATION_BITRATE \}\)/);
   assert.match(read('lib', 'api', 'dictation.ts'), /if \(messageId !== undefined\) body\.append\('message_id', String\(messageId\)\);/);
+});
+
+test('a held clip gives the chat page its voice line by key; a dropped one gives none', () => {
+  const key = holdVoice(new Blob(['TEST DATA voice']), 4_250.4);
+  const line = heldVoiceClip(key);
+  assert.ok(line);
+  assert.equal(line.id, 0, 'not kept by the server yet');
+  assert.equal(line.pending, key, 'the row follows the upload by this key');
+  assert.equal(line.duration_ms, 4_250);
+  assert.match(String(line.url), /^blob:/, 'it plays from this device meanwhile');
+  dropVoice(key);
+  assert.equal(heldVoiceClip(key), null);
 });

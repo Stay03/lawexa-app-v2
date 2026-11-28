@@ -593,6 +593,10 @@ export function HomeComposer({
       onValueChange(joinText(value, text));
       return;
     }
+    // The words stand in the box while the chat is made, as typed words do
+    // (Lucy's check, 27 November 2026: the box sat empty about a second). A send
+    // that fails leaves them there to send again.
+    onValueChange(text);
     await submit(text, clip && voiceKept ? holdVoice(clip, durationMs) : undefined);
   };
   const { state: dictating, dictation } = useDictation({

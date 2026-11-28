@@ -183,3 +183,20 @@ test('the same error delivered twice is drawn once', async () => {
   assert.deepEqual(errors.map((m) => m.content), ["The answer couldn't be shown on this device. Ask again."]);
   engine.disconnect();
 });
+
+test('a homepage question handed over with its voice key shows its voice line at once', async () => {
+  const { holdVoice, dropVoice } = await import('../voice-after-send');
+  const key = holdVoice(new Blob(['TEST DATA voice']), 3_000);
+  const engine = createChatEngine({ getToken: () => 'test-token' });
+  engine.setConversationId('conv-voice');
+  engine.connectToStream('exec-voice', 'TEST DATA. Is the lease registered?', undefined, undefined, 41, key);
+  mock.timers.tick(0);
+  await settle();
+  const question = engine.getSnapshot().messages.find((m) => m.role === 'user');
+  assert.ok(question);
+  const voice = (question as { voiceClip?: { pending?: string; duration_ms: number } }).voiceClip;
+  assert.equal(voice?.pending, key, '"Saving the voice…" follows this upload');
+  assert.equal(voice?.duration_ms, 3_000);
+  engine.disconnect();
+  dropVoice(key);
+});

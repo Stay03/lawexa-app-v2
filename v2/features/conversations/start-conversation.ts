@@ -190,7 +190,7 @@ function toAttachment(a: StartAttachment): MessageAttachment {
  */
 function writeConvInit(
   conversationId: string,
-  data: { msg: string; exec: string; attachments: StartAttachment[]; redaction?: RedactionSummary; uid?: number },
+  data: { msg: string; exec: string; attachments: StartAttachment[]; redaction?: RedactionSummary; uid?: number; voice?: string },
 ): void {
   if (typeof window === 'undefined') return;
   try {
@@ -205,6 +205,9 @@ function writeConvInit(
         }),
         ...(data.redaction && { redaction: data.redaction }),
         ...(typeof data.uid === 'number' && { uid: data.uid }),
+        // The key of the voice going up after this message (voice-after-send), so
+        // the chat page's first row shows "Saving the voice…" and then Play.
+        ...(data.voice && { voice: data.voice }),
       }),
     );
   } catch {
@@ -396,10 +399,12 @@ export async function startConversation(
     const conversationId = response.data.conversation_id;
     const executionId = response.data.execution_id;
     // The words are in; their voice goes up now, linked to the first message.
+    let voiceGoing: string | undefined;
     if (input.voiceKey) {
       const uid = response.data.user_message_id;
       if (uid !== undefined && !confidential && !redacted) void sendHeldVoice(input.voiceKey, uid);
       else dropVoice(input.voiceKey);
+      if (uid !== undefined && !confidential && !redacted) voiceGoing = input.voiceKey;
     }
 
     // Reconcile the IDB temp row with the server id; swap in the redacted form.
@@ -444,6 +449,7 @@ export async function startConversation(
       attachments: sentAttachments,
       redaction,
       uid: response.data.user_message_id,
+      voice: voiceGoing,
     });
 
     // Put the new conversation at the top of every recents cache IMMEDIATELY, so the

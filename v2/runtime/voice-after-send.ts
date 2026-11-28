@@ -1,4 +1,5 @@
 import { dictationApi } from '@/lib/api/dictation';
+import type { VoiceClip } from '@/types/dictation';
 
 /**
  * A dictated message's voice, sent AFTER its words (Arthur, 27 November 2026:
@@ -90,6 +91,19 @@ export function retryHeldVoice(key: string): void {
   if (!voice || voice.state !== 'failed' || voice.messageId === null) return;
   held.set(key, { ...voice, state: 'waiting' });
   void sendHeldVoice(key, voice.messageId);
+}
+
+/**
+ * The voice line for a held clip, as a box draws it on its own question: it
+ * plays from memory, and the key lets the row follow the upload. The chat page
+ * builds it from the key a homepage send hands over, since the clip itself
+ * stays here (Lucy's check, 27 November 2026: "Saving the voice…" never showed
+ * after a homepage send). Null once the clip is gone (not sent, or dropped).
+ */
+export function heldVoiceClip(key: string): VoiceClip | null {
+  const voice = held.get(key);
+  if (!voice) return null;
+  return { id: 0, url: URL.createObjectURL(voice.clip), duration_ms: Math.round(voice.durationMs), pending: key };
 }
 
 export function heldVoiceState(key: string): HeldVoiceState | null {
