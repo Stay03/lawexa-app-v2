@@ -356,6 +356,8 @@ export interface ChatEngine {
     initialRedaction?: RedactionSummary,
     /** The handoff message's saved id, from the start response: the row is drawn as saved. */
     initialMessageId?: number | null,
+    /** The key of the handoff message's voice, still going up (voice-after-send): the row shows its voice line. */
+    initialVoiceKey?: string,
   ): void;
   /**
    * Adopt SERVER history the host fetched — from its cache or over the network.

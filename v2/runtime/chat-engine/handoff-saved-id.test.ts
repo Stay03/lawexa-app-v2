@@ -81,7 +81,8 @@ test('the home handoff carries the start response’s user_message_id, and the c
   assert.match(start, /uid: response\.data\.user_message_id/);
   const controller = read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
   assert.match(controller, /userMessageId: typeof parsed\.uid === 'number' \? parsed\.uid : null,/);
-  assert.match(controller, /connectToStream\(executionId, message, attachments, redaction, userMessageId\);/);
+  // The voice key rides after the saved id (a dictated homepage question, 28 November 2026).
+  assert.match(controller, /connectToStream\(executionId, message, attachments, redaction, userMessageId, voiceKey\);/);
 });
 
 test('C1: an agent called in a new chat’s first turn has its row after that turn, from the handoff', async () => {
